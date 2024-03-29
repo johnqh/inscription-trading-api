@@ -44,7 +44,7 @@ router.get("/", async (req: Request, res: Response) => {
   }
 
   // Retrieving Order Records in an Array
-  const rows: Order[] = await selectOrders(query, params);
+  const rows: Order[] = await connection.select<Order>(query, params);
   res.send(rows);
 });
 
@@ -52,39 +52,28 @@ router.post("/", async (req: Request, res: Response) => {
   const { address, tick, side, amt, price, expiration, expired } = req.body;
 
   // Validate input as needed
-  await connection.execute(
+  connection.conn.execute(
     `INSERT INTO orders (address, tick, side, amt, price, expiration, expired) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [address, tick, side, amt, price, expiration, expired]
   );
-  await connection.end();
+  connection.conn.end();
 
   res.send({ message: "Action added successfully." });
 });
 
 // PUT Modify an Order Record Given its ID
-router.put("/", async (req: Request, res: Response) => {
-  const { id, address, tick, side, amt, price, expiration, expired } = req.body;
+router.put("/:id", async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  const { address, tick, side, amt, price, expiration, expired } = req.body;
 
   // Validate input as needed
-  await connection.execute(
+  connection.conn.execute(
     `UPDATE orders SET address = ?, tick = ?, side = ?, amt = ?, price = ?, expiration = ?, expired = ? WHERE id = ?`,
     [address, tick, side, amt, price, expiration, expired, id]
   );
-  await connection.end();
+  connection.conn.end();
 
   res.send({ message: "Action added successfully." });
 });
 
 export default router;
-
-function selectOrders(query: string, params: String[]): Promise<Order[]> {
-  return new Promise((resolve, reject) => {
-    connection.query<Order[]>(query, params, (err, res) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(res);
-      }
-    });
-  });
-}

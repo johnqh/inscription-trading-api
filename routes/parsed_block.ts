@@ -9,7 +9,7 @@ interface ParsedBlock extends RowDataPacket {
 const router = express.Router();
 
 router.get('/', async (_req: Request, res: Response) => {
-	let response: ParsedBlock[] = await selectParsedBlock();
+	let response: ParsedBlock[] = await connection.select<ParsedBlock>("SELECT * FROM parsed_block LIMIT 1", []);
 
 	if (response.length == 0) {
 		return res.status(404).send({ error: 'No parsed block available.' });
@@ -35,30 +35,15 @@ router.post('/', async (req: Request, res: Response) => {
 
 export default router;
 
-function selectParsedBlock(): Promise<ParsedBlock[]> {
-	return new Promise((resolve, reject) => {
-		connection.query<ParsedBlock[]>(
-			"SELECT * FROM parsed_block LIMIT 1",
-			(err, res) => {
-				if (err) {
-					reject(err);
-				}
-				else {
-					resolve(res);
-				}
-			});
-	});
-}
-
 async function setParsedBlock(new_val: number) {
-	const response: ParsedBlock[] = await selectParsedBlock();
+	const response: ParsedBlock[] = await connection.select<ParsedBlock>("SELECT * FROM parsed_block LIMIT 1", []);
 
 	if (response.length > 0) {
-		connection.execute(
+		connection.conn.execute(
 			`UPDATE parsed_block SET last_parsed_block = ?`,
 			[new_val]);
 	} else {
-		connection.execute(
+		connection.conn.execute(
 			`INSERT INTO parsed_block (last_parsed_block) VALUES (?)`,
 			[new_val]);
 	}

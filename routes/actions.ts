@@ -39,7 +39,7 @@ router.get('/', async (req: Request, res: Response) => {
 		query += ' WHERE ' + conditions.join(' AND ');
 	}
 
-	let response: Action[] = await selectActions(query, params);
+	let response: Action[] = await connection.select<Action>(query, params);
 	res.send(response);
 });
 
@@ -63,22 +63,10 @@ router.post('/', async (req: Request, res: Response) => {
 
 export default router;
 
-function selectActions(query: string, params: String[]): Promise<Action[]> {
-	return new Promise((resolve, reject) => {
-		connection.query<Action[]>(query, params, (err, res) => {
-			if (err) {
-				reject(err);
-			} else {
-				resolve(res);
-			}
-		});
-	});
-}
-
 async function addAction(request: Action): Promise<void> {
 	// Allow nullable destination
 	if (request.destination) {
-		connection.execute(
+		connection.conn.execute(
 			`INSERT INTO actions (address, tick, action, amt, destination, block) VALUES (?, ?, ?, ?, ?, ?)`,
 			[request.address, request.tick, request.action, request.amt, request.destination, request.block],
 			err => {
@@ -88,7 +76,7 @@ async function addAction(request: Action): Promise<void> {
 			}
 		);
 	} else {
-		connection.execute(
+		connection.conn.execute(
 			`INSERT INTO actions (address, tick, action, amt, block) VALUES (?, ?, ?, ?, ?)`,
 			[request.address, request.tick, request.action, request.amt, request.block],
 			err => {
