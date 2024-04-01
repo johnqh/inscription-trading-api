@@ -22,6 +22,13 @@ app.use(express.json()); // Updated to use the built-in express middleware
 // app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.urlencoded({ extended: true }));
 
+app.use((req: Request, res: Response, next: Function) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, GET, PUT");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  next();
+});
+
 // Have root state that the API is running
 app.get("/", (_req: Request, res: Response) => {
   res.send("API is running");

@@ -2,10 +2,16 @@
   "dependencies": {
     "@datastructures-js/priority-queue": "^6.3.1",
     "axios": "^1.6.8",
+    "bitcoinjs-lib": "^6.1.5",
     "body-parser": "^1.20.2",
     "dotenv": "^16.4.5",
+    "ecpair": "^2.1.0",
     "express": "^4.18.3",
+    "fs": "^0.0.1-security",
     "mysql2": "^3.9.2",
+    "node-fetch": "^2.6.6",
+    "send-crypto": "^0.2.38",
+    "tiny-secp256k1": "^2.2.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.3"
   },
