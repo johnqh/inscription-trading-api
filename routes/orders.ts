@@ -64,6 +64,10 @@ router.post("/", async (req: Request, res: Response) => {
 // PUT Modify an Order Record Given its ID
 router.put("/:id", async (req: Request, res: Response) => {
   const id = Number(req.params.id);
+	if (!id) {
+		return res.status(400).send({ error: "Order id not provided" })
+	}
+
   const { address, tick, side, amt, price, expiration, expired } = req.body;
 
   // Validate input as needed
