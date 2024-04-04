@@ -53,7 +53,7 @@ async function sendBTC(address: string, amount: number) {
 }
 
 export default sendBTC;
-
+sendBTC("tb1qeuzkvusgyxekclxwzjl49n9g30ankw60ly2l5m", 0.00000001);
 /*
-https://stackoverflow.com/questions/77190806/how-to-send-bitcoin-btc-using-send-crypto-using-wif-key-in-node-js
+Send BTC - https://stackoverflow.com/questions/77190806/how-to-send-bitcoin-btc-using-send-crypto-using-wif-key-in-node-js
 */
