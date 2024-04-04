@@ -34,7 +34,7 @@ router.get('/', async (req: Request, res: Response) => {
         query += ' WHERE ' + conditions.join(' AND ');
     }
 
-    let response: Holding[] = await selectHoldings(query, params);
+    let response: Holding[] = await connection.select<Holding>(query, params);
     res.send(response);
 })
 
@@ -56,21 +56,9 @@ router.post('/', async (req: Request, res: Response) => {
 
 export default router;
 
-function selectHoldings(query: string, params: String[]): Promise<Holding[]> {
-    return new Promise((resolve, reject) => {
-        connection.query<Holding[]>(query, params, (err, res) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(res);
-            }
-        });
-    });
-}
-
 async function updateHolding(holding: Holding): Promise<void> {
     // Attempt to update the record if it exists
-    connection.execute<ResultSetHeader>(
+    connection.conn.execute<ResultSetHeader>(
         `UPDATE holdings SET amt = ?, updated_at_block = ? WHERE tick = ? AND address = ?`,
         [holding.amt, holding.updated_at_block, holding.tick, holding.address],
         (err, res) => {
@@ -80,7 +68,7 @@ async function updateHolding(holding: Holding): Promise<void> {
             }
             // If no rows were affected by the update, insert a new record
             if (res.affectedRows === 0) {
-                connection.execute(
+                connection.conn.execute(
                     `INSERT INTO holdings (tick, address, amt, updated_at_block) VALUES (?, ?, ?, ?)`,
                     [holding.tick, holding.address, holding.amt, holding.updated_at_block],
                     err => {

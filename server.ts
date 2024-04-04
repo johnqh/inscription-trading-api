@@ -5,6 +5,7 @@ import parsed_block from './routes/parsed_block';
 import actions from './routes/actions';
 import holdings from './routes/holdings';
 import deploy from './routes/deploy';
+import historical_records from './routes/historical_records';
 
 // Get address for MySQL server
 dotenv.config();
@@ -27,6 +28,7 @@ app.use('/actions', actions);
 app.use('/holdings', holdings);
 app.use('/deploy', deploy);
 app.use('/orders', orders);
+app.use('/historical_records', historical_records);
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
