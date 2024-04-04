@@ -13,11 +13,6 @@ const router = express.Router();
 
 router.get('/', async (_req: Request, res: Response) => {
     let response: Deploy[] = await connection.select<Deploy>("SELECT * FROM deploy", []);
-
-    if (response.length === 0) {
-        return res.status(404).send({ error: 'No deploy information available.' });
-    }
-
     res.send(response);
 })
 
