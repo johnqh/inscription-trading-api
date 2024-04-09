@@ -1,7 +1,6 @@
-
-import express, { Request, Response } from 'express';
-import { RowDataPacket } from 'mysql2';
-import connection from '../connection';
+import express, { Request, Response } from "express";
+import { RowDataPacket } from "mysql2";
+import connection from "../connection";
 
 interface Order extends RowDataPacket {
   id: number;
@@ -12,6 +11,7 @@ interface Order extends RowDataPacket {
   price: number;
   expiration: number;
   expired: number;
+  txid: string;
 }
 
 const router = express.Router();
@@ -49,12 +49,13 @@ router.get("/", async (req: Request, res: Response) => {
 });
 
 router.post("/", async (req: Request, res: Response) => {
-  const { address, tick, side, amt, price, expiration, expired } = req.body;
+  const { address, tick, side, amt, price, expiration, expired, txid } =
+    req.body;
 
   // Validate input as needed
   connection.conn.execute(
-    `INSERT INTO orders (address, tick, side, amt, price, expiration, expired) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [address, tick, side, amt, price, expiration, expired]
+    `INSERT INTO orders (address, tick, side, amt, price, expiration, expired, txid) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [address, tick, side, amt, price, expiration, expired, txid]
   );
   connection.conn.end();
 
@@ -64,16 +65,17 @@ router.post("/", async (req: Request, res: Response) => {
 // PUT Modify an Order Record Given its ID
 router.put("/:id", async (req: Request, res: Response) => {
   const id = Number(req.params.id);
-	if (!id) {
-		return res.status(400).send({ error: "Order id not provided" })
-	}
+  if (!id) {
+    return res.status(400).send({ error: "Order id not provided" });
+  }
 
-  const { address, tick, side, amt, price, expiration, expired } = req.body;
+  const { address, tick, side, amt, price, expiration, expired, txid } =
+    req.body;
 
   // Validate input as needed
   connection.conn.execute(
-    `UPDATE orders SET address = ?, tick = ?, side = ?, amt = ?, price = ?, expiration = ?, expired = ? WHERE id = ?`,
-    [address, tick, side, amt, price, expiration, expired, id]
+    `UPDATE orders SET address = ?, tick = ?, side = ?, amt = ?, price = ?, expiration = ?, expired = ?, txid = ? WHERE id = ?`,
+    [address, tick, side, amt, price, expiration, expired, id, txid]
   );
   connection.conn.end();
 

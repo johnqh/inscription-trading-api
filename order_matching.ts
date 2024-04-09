@@ -6,7 +6,7 @@ import {
 import moment from "moment";
 
 import axios from "axios";
-import sendBTC from "./send_btc3";
+import completeOrder from "./fulfill_order";
 
 const apiPrefix = "http://localhost:3000";
 
@@ -21,14 +21,21 @@ interface HistoricalRecord {
   fee?: number;
   btc_amount?: number;
   datetime: string;
+  txid?: string; // optional
 }
 
-const getHistoricalRecordValue: IGetCompareValue<HistoricalRecord> = (HistoricalRecord) => HistoricalRecord.price;
+const getHistoricalRecordValue: IGetCompareValue<HistoricalRecord> = (
+  HistoricalRecord
+) => HistoricalRecord.price;
 
 async function main() {
   // Buy/ Sell Queue
-  const BuyQueue = new MaxPriorityQueue<HistoricalRecord>(getHistoricalRecordValue);
-  const SellQueue = new MaxPriorityQueue<HistoricalRecord>(getHistoricalRecordValue);
+  const BuyQueue = new MaxPriorityQueue<HistoricalRecord>(
+    getHistoricalRecordValue
+  );
+  const SellQueue = new MaxPriorityQueue<HistoricalRecord>(
+    getHistoricalRecordValue
+  );
 
   // Load Orders from Database
   const response = await axios.get(`${apiPrefix}/orders`);
@@ -45,7 +52,7 @@ async function main() {
         token: order.tick,
         fee: order.price * order.amt * 0.01,
         btc_amount: order.price * order.amt,
-        datetime: moment().format("yyyy-mm-dd hh:mm:ss"),
+        datetime: moment().format("YYYY-MM-DD HH:mm:ss"),
       });
     } else {
       BuyQueue.push({
@@ -56,7 +63,8 @@ async function main() {
         token: order.tick,
         fee: order.price * order.amt * 0.01,
         btc_amount: order.price * order.amt,
-        datetime: moment().format("yyyy-mm-dd hh:mm:ss"),
+        datetime: moment().format("YYYY-MM-DD HH:mm:ss"),
+        txid: order.txid,
       });
     }
   }
@@ -69,6 +77,8 @@ async function main() {
 
     // Current Size of the Amount of Tokens to Give to Bidder (Amt)
     let remainingTokens = bid.token_size;
+    const txid = bid.txid || "";
+    delete bid.txid; // delete from historical record
 
     while (!SellQueue.isEmpty() && remainingTokens > 0) {
       const ask = SellQueue.front();
@@ -109,17 +119,28 @@ async function main() {
 
       for (const ask of asksConsumed) {
         // Populate Historical Record Table for Seller(s)
-        axios.post(`${apiPrefix}/historical_records`, ask);
+        // axios.post(`${apiPrefix}/historical_records`, ask);
       }
 
       // Populate Historical Record Table for Buyer
-      axios.post(`${apiPrefix}/historical_records`, bid);
+      // axios.post(`${apiPrefix}/historical_records`, bid);
 
       // TODO: Perform Transfers
       try {
-        for (let sender of asksConsumed) {
-          console.log("SENDING: " + sender.btc_amount)
-          // sendBTC(sender.address, sender.btc_amount);
+        for (let seller of asksConsumed) {
+          console.log("SENDING: " + seller.btc_amount);
+          console.log(`${bid.address},
+            ${seller.address},
+            ${bid.token},
+            ${String(seller.token_size)},
+            ${txid}`);
+          completeOrder(
+            bid.address,
+            seller.address,
+            bid.token,
+            String(seller.token_size),
+            txid
+          );
         }
       } catch (e) {
         console.log(e);

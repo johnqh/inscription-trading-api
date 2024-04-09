@@ -624,6 +624,12 @@ async function completeOrder(
 
   let inscription_txid = "";
 
+  // const intervalId = setInterval(()=> {
+
+  //     clearInterval(intervalId);
+
+  // }, 10000);
+
   while ((inscription_txid = await checkStatus(response.orderId)) == null) {
     console.log("----- Still checking status -----");
     sleep.sleep(10);
@@ -638,13 +644,15 @@ async function completeOrder(
   );
 }
 
-completeOrder(
-  "tb1qsd4vyrwaq0measpe457g8ygw4ajh0yu9gf0267",
-  "tb1q2ywtspy5wxd8een66s7nararjhuftk9g52682c",
-  "sats",
-  "10",
-  "690a8a5b64671cc0fa973f8e94b28fe19dd470961aaa7327b4823c2327850449"
-);
+// completeOrder(
+//   "tb1qsd4vyrwaq0measpe457g8ygw4ajh0yu9gf0267",
+//   "tb1q2ywtspy5wxd8een66s7nararjhuftk9g52682c",
+//   "sats",
+//   "10",
+//   "690a8a5b64671cc0fa973f8e94b28fe19dd470961aaa7327b4823c2327850449"
+// );
+
+export default completeOrder;
 
 /*
 ------- References ----
