@@ -17,17 +17,25 @@ router.get('/', async (req: Request, res: Response) => {
     let addr = req.query.address;
 
     // Due to a change in design, address must always be provided
-    if (!addr) {
+    if (!addr || addr == "undefined") {
         return res.status(400).send({ error: "Address not provided" })
     }
 
     let tick = req.query.tick;
 
     let data = await axios.get(
-        `https://open-api-testnet.unisat.io/v1/indexer/address/${addr}/brc20/summary?start=0&limit=100`,
+        `https://open-api-testnet.unisat.io/v1/indexer/address/${addr}/brc20/summary?start=0&limit=16`,
         { headers: { 'Authorization': `Bearer ${connection.apiKey}` } }
     );
-    let output = data.data.data;
+    let output = data.data;
+
+    // Handle error code -2003
+    if (output.code == -2003) {
+	    return res.status(500).send({ error: "API key exceeded quota, try again later" });
+    }
+    output = output.data;
+
+
     let height = output.height;
 
     // Format unisat output to holdings
@@ -38,7 +46,7 @@ router.get('/', async (req: Request, res: Response) => {
                 address: addr,
                 // Avail balance over overall balance since the value in
                 // inscriptions can't be used
-                amt: detail.availableBalance,
+                amt: +detail.availableBalance,
                 updated_at_block: height
             }
         }
