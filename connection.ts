@@ -19,4 +19,7 @@ function select<T extends mysql.RowDataPacket>(query: string, params: String[]):
   });
 }
 
-export default {conn, select}
+// UniSat API Key. Required to get the holdings
+const apiKey: string = process.env.API_KEY!;
+
+export default {conn, select, apiKey}
