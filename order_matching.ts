@@ -7,6 +7,7 @@ import moment from "moment";
 
 import axios from "axios";
 import completeOrder from "./fulfill_order";
+import { Order } from "./routes/orders";
 
 const apiPrefix = "http://localhost:3000";
 
@@ -21,14 +22,14 @@ interface HistoricalRecord {
   fee?: number;
   btc_amount?: number;
   datetime: string;
-  txid?: string; // optional
+  order?: Order; // Optional
 }
 
 const getHistoricalRecordValue: IGetCompareValue<HistoricalRecord> = (
   HistoricalRecord
 ) => HistoricalRecord.price;
 
-async function main() {
+async function orderMatching() {
   // Buy/ Sell Queue
   const BuyQueue = new MaxPriorityQueue<HistoricalRecord>(
     getHistoricalRecordValue
@@ -43,6 +44,11 @@ async function main() {
 
   // Populating the Queue
   for (const order of orders) {
+    // Order is Fulfilled Thus Don't Want to Process it
+    if (order.fulfilled == 1) {
+      continue;
+    }
+
     if (order.side === 0) {
       SellQueue.push({
         address: order.address,
@@ -53,6 +59,7 @@ async function main() {
         fee: order.price * order.amt * 0.01,
         btc_amount: order.price * order.amt,
         datetime: moment().format("YYYY-MM-DD HH:mm:ss"),
+        order: order,
       });
     } else {
       BuyQueue.push({
@@ -64,7 +71,7 @@ async function main() {
         fee: order.price * order.amt * 0.01,
         btc_amount: order.price * order.amt,
         datetime: moment().format("YYYY-MM-DD HH:mm:ss"),
-        txid: order.txid,
+        order: order,
       });
     }
   }
@@ -72,13 +79,24 @@ async function main() {
   let asksPending: HistoricalRecord[] = []; // All the Aks that were Too Expensive so Put Aside for Now
   let asksConsumed: HistoricalRecord[] = []; // Storing the Transfer that We Need to Fulfill this Order
 
+  console.log("BUY");
+  console.log(BuyQueue.toArray());
+  console.log("SELL");
+  console.log(SellQueue.toArray());
+
   while (!BuyQueue.isEmpty()) {
     const bid = BuyQueue.pop();
 
     // Current Size of the Amount of Tokens to Give to Bidder (Amt)
     let remainingTokens = bid.token_size;
-    const txid = bid.txid || "";
-    delete bid.txid; // delete from historical record
+    const bidOrder = bid.order;
+    let txid = "";
+
+    if (bidOrder && bidOrder.txid) {
+      txid = bidOrder.txid;
+    }
+
+    delete bid.order; // delete order because it doesn't exist in the Historical Record
 
     while (!SellQueue.isEmpty() && remainingTokens > 0) {
       const ask = SellQueue.front();
@@ -93,7 +111,7 @@ async function main() {
         // Asks Has More than Enough Tokens
         ask.token_size -= remainingTokens;
 
-        // How Big The Order was & Needed to Create a NEw Order Because we are not using the whole ask so its not the same info
+        // How Big The Order was & Needed to Create a New Order Because we are not using the whole ask so its not the same info
         asksConsumed.push({
           address: ask.address,
           token_size: remainingTokens,
@@ -117,15 +135,7 @@ async function main() {
     } else {
       // Did Fulfill the Order
 
-      for (const ask of asksConsumed) {
-        // Populate Historical Record Table for Seller(s)
-        // axios.post(`${apiPrefix}/historical_records`, ask);
-      }
-
-      // Populate Historical Record Table for Buyer
-      // axios.post(`${apiPrefix}/historical_records`, bid);
-
-      // TODO: Perform Transfers
+      // Perform Transfers
       try {
         for (let seller of asksConsumed) {
           console.log("SENDING: " + seller.btc_amount);
@@ -142,6 +152,38 @@ async function main() {
             txid
           );
         }
+
+        // Looping through the Seller's the Buyer Consumed
+        for (const ask of asksConsumed) {
+          let askOrder = ask.order;
+          delete ask.order; // Delete from Historical Records
+
+          // Populate Historical Record Table for Seller(s)
+          await axios.post(`${apiPrefix}/historical_records`, ask);
+
+          // Edge Case for Last Seller whose's Tokens were Not All Used Up
+          if (askOrder) {
+            if (ask.token_size < askOrder.amt) {
+              // Update Amount of Last Order if It was Not All used up by the Buyer
+              await axios.put(`${apiPrefix}/orders/${askOrder.id}`, {
+                amt: askOrder.amt - ask.token_size,
+              });
+            } else {
+              // Update Fulfilled to True to Avoid Reprcossing old Orders
+              await axios.put(`${apiPrefix}/orders/${askOrder.id}`, {
+                fulfilled: 1,
+              });
+            }
+          }
+        }
+
+        // Populate Historical Record Table for Buyer
+        await axios.post(`${apiPrefix}/historical_records`, bid);
+
+        // Update Fulfilled to True to Avoid Reprcossing old Orders
+        await axios.put(`${apiPrefix}/orders/${bidOrder ? bidOrder.id : ""}`, {
+          fulfilled: 1,
+        });
       } catch (e) {
         console.log(e);
       }
@@ -165,7 +207,7 @@ async function main() {
   asksPending = [];
 }
 
-main();
+export default orderMatching;
 
 /*
 -------------------- References --------------------

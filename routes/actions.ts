@@ -14,33 +14,37 @@ interface Action extends RowDataPacket {
 const router = express.Router();
 
 router.get('/', async (req: Request, res: Response) => {
+  // check query string
+  let addr = req.query.address;
+  let tick = req.query.tick;
 
-	// check query string
-	let addr = req.query.address;
-	let tick = req.query.tick;
+  // response
+  let query: string = "SELECT * FROM actions";
+  let conditions: String[] = [];
+  let params: String[] = [];
 
-	// response
-	let query: string = "SELECT * FROM actions";
-	let conditions: String[] = [];
-	let params: String[] = [];
+  // modify query based on request parameters
+  if (addr) {
+    conditions.push("address = ?");
+    params.push(`${addr}`);
+  }
 
-	// modify query based on request parameters
-	if (addr) {
-		conditions.push('address = ?');
-		params.push(`${addr}`);
-	}
+  if (tick) {
+    conditions.push("tick = ?");
+    params.push(`${tick}`);
+  }
 
-	if (tick) {
-		conditions.push('tick = ?');
-		params.push(`${tick}`);
-	}
+  if (conditions.length) {
+    query += " WHERE " + conditions.join(" AND ");
+  }
 
-	if (conditions.length) {
-		query += ' WHERE ' + conditions.join(' AND ');
-	}
+  // Open Connection
+  connection.connect();
 
-	let response: Action[] = await connection.select<Action>(query, params);
-	res.send(response);
+  let response: Action[] = await connection.select<Action>(query, params);
+
+  connection.close();
+  res.send(response);
 });
 
 router.post('/', async (req: Request, res: Response) => {
@@ -64,26 +68,43 @@ router.post('/', async (req: Request, res: Response) => {
 export default router;
 
 async function addAction(request: Action): Promise<void> {
-	// Allow nullable destination
-	if (request.destination) {
-		connection.conn.execute(
-			`INSERT INTO actions (address, tick, action, amt, destination, block) VALUES (?, ?, ?, ?, ?, ?)`,
-			[request.address, request.tick, request.action, request.amt, request.destination, request.block],
-			err => {
-				if (err) {
-					console.error(err);
-				}
-			}
-		);
-	} else {
-		connection.conn.execute(
-			`INSERT INTO actions (address, tick, action, amt, block) VALUES (?, ?, ?, ?, ?)`,
-			[request.address, request.tick, request.action, request.amt, request.block],
-			err => {
-				if (err) {
-					console.error(err);
-				}
-			}
-		);
-	}
+  // Open Connection
+  connection.connect();
+  // Allow nullable destination
+  if (request.destination) {
+    connection.getConnection().execute(
+      `INSERT INTO actions (address, tick, action, amt, destination, block) VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        request.address,
+        request.tick,
+        request.action,
+        request.amt,
+        request.destination,
+        request.block,
+      ],
+      (err) => {
+        if (err) {
+          console.error(err);
+        }
+      }
+    );
+  } else {
+    connection.getConnection().execute(
+      `INSERT INTO actions (address, tick, action, amt, block) VALUES (?, ?, ?, ?, ?)`,
+      [
+        request.address,
+        request.tick,
+        request.action,
+        request.amt,
+        request.block,
+      ],
+      (err) => {
+        if (err) {
+          console.error(err);
+        }
+      }
+    );
+  }
+
+  connection.close();
 }

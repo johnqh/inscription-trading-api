@@ -608,10 +608,14 @@ async function completeOrder(
   amount: string,
   utxo_txid: string
 ) {
+  console.log("HERE");
+  console.log(utxo_txid);
+
   const response: any = await placeInscriptionOrder(tick, amount);
   console.log("----- RESPONSE FROM UNISAT -----");
   console.log(response);
   const unisat = response.payAddress;
+
   const inscription_change_txid = await sendBTC(
     exchange_wallet,
     unisat,
@@ -643,14 +647,6 @@ async function completeOrder(
     inscription_change_txid
   );
 }
-
-// completeOrder(
-//   "tb1qsd4vyrwaq0measpe457g8ygw4ajh0yu9gf0267",
-//   "tb1q2ywtspy5wxd8een66s7nararjhuftk9g52682c",
-//   "sats",
-//   "10",
-//   "690a8a5b64671cc0fa973f8e94b28fe19dd470961aaa7327b4823c2327850449"
-// );
 
 export default completeOrder;
 

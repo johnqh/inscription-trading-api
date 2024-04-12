@@ -28,70 +28,112 @@ router.get('/', async (req: Request, res: Response) => {
 		params.push(`${addr}`);
 	}
 
+	// Open Connection
+	connection.connect();
+
 	const rows: HistoricalRecord[] = await connection.select<HistoricalRecord>(query, params);
+
+	connection.close();
+
 	res.send(rows);
 });
 
 router.post('/', async (req: Request, res: Response) => {
-	const { address, action, token_size, token, price, fee, btc_amount, datetime } = req.body;
+  const {
+    address,
+    action,
+    token_size,
+    token,
+    price,
+    fee,
+    btc_amount,
+    datetime,
+  } = req.body;
 
-	// handle optional fields
-	let query: string = "INSERT INTO historical_records (address, action, token_size, token, datetime";
-	let values = "VALUES (?, ?, ?, ?, ?";
-	let params: any[] = [address, action, token_size, token, datetime];
+  // handle optional fields
+  let query: string =
+    "INSERT INTO historical_records (address, action, token_size, token, datetime";
+  let values = "VALUES (?, ?, ?, ?, ?";
+  let params: any[] = [address, action, token_size, token, datetime];
 
-	if (price) {
-		query += ", price";
-		values += ", ?";
-		params.push(price);
-	}
+  if (price) {
+    query += ", price";
+    values += ", ?";
+    params.push(price);
+  }
 
-	if (fee) {
-		query += ", fee";
-		values += ", ?";
-		params.push(fee);
-	}
+  if (fee) {
+    query += ", fee";
+    values += ", ?";
+    params.push(fee);
+  }
 
-	if (btc_amount) {
-		query += ", btc_amount";
-		values += ", ?";
-		params.push(btc_amount);
-	}
+  if (btc_amount) {
+    query += ", btc_amount";
+    values += ", ?";
+    params.push(btc_amount);
+  }
 
-	query += ") " + values + ")";
+  query += ") " + values + ")";
 
-	connection.conn.execute(query, params);
+  // Open Connection
+  connection.connect();
 
-	res.send({ message: "Record added" });
+  connection.execute(query, params);
 
+  connection.close();
+
+  res.send({ message: "Record added" });
 });
 
 router.put('/:id', async (req: Request, res: Response) => {
-	const id = Number(req.params.id);
-	if (!id) {
-		return res.status(400).send({ error: "Record id not provided" })
-	}
+  const id = Number(req.params.id);
+  if (!id) {
+    return res.status(400).send({ error: "Record id not provided" });
+  }
 
-	const { address, action, token_size, token, price, fee, btc_amount, datetime } = req.body;
-	let query: string = "UPDATE orders SET address = ?, action = ?, token_size = ?, token = ?, price = ?, fee = ?, btc_amount = ?, datetime = ? WHERE id = ?";
+  const {
+    address,
+    action,
+    token_size,
+    token,
+    price,
+    fee,
+    btc_amount,
+    datetime,
+  } = req.body;
+  let query: string =
+    "UPDATE orders SET address = ?, action = ?, token_size = ?, token = ?, price = ?, fee = ?, btc_amount = ?, datetime = ? WHERE id = ?";
 
-	connection.conn.execute(query, [address, action, token_size, token, price, fee, btc_amount, datetime]);
-	connection.conn.end();
+  // Open Connection
+  connection.connect();
+  connection.execute(query, [
+    address,
+    action,
+    token_size,
+    token,
+    price,
+    fee,
+    btc_amount,
+    datetime,
+  ]);
+  connection.close();
 
-	res.send({ message: "Record added" });
+  res.send({ message: "Record added" });
 });
 
 router.delete('/:id', async (req: Request, res: Response) => {
-	const id = Number(req.params.id);
-	if (!id) {
-		return res.status(400).send({ error: "Record id not provided" })
-	}
+  const id = Number(req.params.id);
+  if (!id) {
+    return res.status(400).send({ error: "Record id not provided" });
+  }
 
-	connection.conn.execute("DELETE FROM historical_records WHERE id = ?", [id]);
-	connection.conn.end();
+  // Open Connection
+  connection.connect();
+  connection.execute("DELETE FROM historical_records WHERE id = ?", [id]);
+  connection.close();
 
-	res.send({ message: "Record deleted" })
-
+  res.send({ message: "Record deleted" });
 });
 
 export default router;

@@ -1,8 +1,9 @@
 import express, { Request, Response } from "express";
 import { RowDataPacket } from "mysql2";
 import connection from "../connection";
+import orderMatching from "../order_matching";
 
-interface Order extends RowDataPacket {
+export interface Order extends RowDataPacket {
   id: number;
   address: string;
   tick: string;
@@ -12,6 +13,7 @@ interface Order extends RowDataPacket {
   expiration: number;
   expired: number;
   txid: string;
+  fulfilled: number;
 }
 
 const router = express.Router();
@@ -42,6 +44,8 @@ router.get("/", async (req: Request, res: Response) => {
   if (conditions.length) {
     query += " WHERE " + conditions.join(" AND ");
   }
+  // Open Connection
+  connection.connect();
 
   // Retrieving Order Records in an Array
   const rows: Order[] = await connection.select<Order>(query, params);
@@ -49,35 +53,69 @@ router.get("/", async (req: Request, res: Response) => {
 });
 
 router.post("/", async (req: Request, res: Response) => {
-  const { address, tick, side, amt, price, expiration, expired, txid } =
-    req.body;
+  const {
+    address,
+    tick,
+    side,
+    amt,
+    price,
+    expiration,
+    expired,
+    txid,
+    fulfilled,
+  } = req.body;
+
+  // Open Connection
+  connection.connect();
 
   // Validate input as needed
-  connection.conn.execute(
-    `INSERT INTO orders (address, tick, side, amt, price, expiration, expired, txid) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [address, tick, side, amt, price, expiration, expired, txid]
+  connection.getConnection().execute(
+    `INSERT INTO orders (address, tick, side, amt, price, expiration, expired, txid, fulfilled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [address, tick, side, amt, price, expiration, expired, txid, fulfilled],
+    (err, res) => {
+      // orderMatching();
+    }
   );
-  connection.conn.end();
+
+  connection.close();
+
+  // Evoke Order Matching when Order is Placed
+  // orderMatching();
 
   res.send({ message: "Action added successfully." });
 });
 
 // PUT Modify an Order Record Given its ID
 router.put("/:id", async (req: Request, res: Response) => {
+  console.log(req.body);
   const id = Number(req.params.id);
   if (!id) {
     return res.status(400).send({ error: "Order id not provided" });
   }
+  console.log(id);
 
-  const { address, tick, side, amt, price, expiration, expired, txid } =
-    req.body;
+  let sql = "UPDATE orders SET ";
+  let values: any[] = [];
 
-  // Validate input as needed
-  connection.conn.execute(
-    `UPDATE orders SET address = ?, tick = ?, side = ?, amt = ?, price = ?, expiration = ?, expired = ?, txid = ? WHERE id = ?`,
-    [address, tick, side, amt, price, expiration, expired, id, txid]
-  );
-  connection.conn.end();
+  for (const attr in req.body) {
+    sql += attr + " = ?, ";
+    values.push(req.body[attr]);
+  }
+
+  // Remove the Last Comma & Space
+  sql = sql.slice(0, -2);
+
+  sql += " WHERE id = ?";
+
+  values.push(id);
+  console.log(sql);
+  console.log(values);
+
+  // Open Connection
+  connection.connect();
+  connection.execute(sql, values);
+
+  connection.close();
 
   res.send({ message: "Action added successfully." });
 });

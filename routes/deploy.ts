@@ -12,8 +12,15 @@ interface Deploy extends RowDataPacket {
 const router = express.Router();
 
 router.get('/', async (_req: Request, res: Response) => {
-    let response: Deploy[] = await connection.select<Deploy>("SELECT * FROM deploy", []);
-    res.send(response);
+  // Open Connection
+  connection.connect();
+  let response: Deploy[] = await connection.select<Deploy>(
+    "SELECT * FROM deploy",
+    []
+  );
+
+  connection.close();
+  res.send(response);
 })
 
 router.post('/', async (req: Request, res: Response) => {
@@ -35,13 +42,16 @@ router.post('/', async (req: Request, res: Response) => {
 export default router;
 
 async function addDeploy(deploy: Deploy): Promise<void> {
-    connection.conn.execute(
-        `INSERT INTO deploy (tick, max, lim, block) VALUES (?, ?, ?, ?)`,
-        [deploy.tick, deploy.max, deploy.lim, deploy.block],
-        err => {
-            if (err) {
-                console.error(err);
-            }
-        }
-    )
+  // Open Connection
+  connection.connect();
+  connection.getConnection().execute(
+    `INSERT INTO deploy (tick, max, lim, block) VALUES (?, ?, ?, ?)`,
+    [deploy.tick, deploy.max, deploy.lim, deploy.block],
+    (err) => {
+      if (err) {
+        console.error(err);
+      }
+    }
+  );
+  connection.close();
 }

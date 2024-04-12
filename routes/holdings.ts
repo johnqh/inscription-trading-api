@@ -12,30 +12,36 @@ interface Holding extends RowDataPacket {
 const router = express.Router();
 
 router.get('/', async (req: Request, res: Response) => {
-    let addr = req.query.address;
-    let tick = req.query.tick;
+  let addr = req.query.address;
+  let tick = req.query.tick;
 
-    let query: string = 'SELECT * FROM holdings';
-    let conditions: String[] = [];
-    let params: String[] = [];
+  let query: string = "SELECT * FROM holdings";
+  let conditions: String[] = [];
+  let params: String[] = [];
 
-    // modify query based on request parameters
-    if (addr) {
-        conditions.push('address = ?');
-        params.push(`${addr}`);
-    }
+  // modify query based on request parameters
+  if (addr) {
+    conditions.push("address = ?");
+    params.push(`${addr}`);
+  }
 
-    if (tick) {
-        conditions.push('tick = ?');
-        params.push(`${tick}`);
-    }
+  if (tick) {
+    conditions.push("tick = ?");
+    params.push(`${tick}`);
+  }
 
-    if (conditions.length) {
-        query += ' WHERE ' + conditions.join(' AND ');
-    }
+  if (conditions.length) {
+    query += " WHERE " + conditions.join(" AND ");
+  }
 
-    let response: Holding[] = await connection.select<Holding>(query, params);
-    res.send(response);
+  // Open Connection
+  connection.connect();
+
+  let response: Holding[] = await connection.select<Holding>(query, params);
+
+  connection.close();
+
+  res.send(response);
 })
 
 router.post('/', async (req: Request, res: Response) => {
@@ -57,28 +63,35 @@ router.post('/', async (req: Request, res: Response) => {
 export default router;
 
 async function updateHolding(holding: Holding): Promise<void> {
-    // Attempt to update the record if it exists
-    connection.conn.execute<ResultSetHeader>(
-        `UPDATE holdings SET amt = ?, updated_at_block = ? WHERE tick = ? AND address = ?`,
-        [holding.amt, holding.updated_at_block, holding.tick, holding.address],
-        (err, res) => {
-            if (err) {
-                console.error(err);
-                return;
-            }
-            // If no rows were affected by the update, insert a new record
-            if (res.affectedRows === 0) {
-                connection.conn.execute(
-                    `INSERT INTO holdings (tick, address, amt, updated_at_block) VALUES (?, ?, ?, ?)`,
-                    [holding.tick, holding.address, holding.amt, holding.updated_at_block],
-                    err => {
-                        if (err) {
-                            console.error(err);
-                        }
-                    }
-                );
-            }
-        }
-    );
+  // Open Connection
+  connection.connect();
 
+  // Attempt to update the record if it exists
+  connection.getConnection().execute<ResultSetHeader>(
+    `UPDATE holdings SET amt = ?, updated_at_block = ? WHERE tick = ? AND address = ?`,
+    [holding.amt, holding.updated_at_block, holding.tick, holding.address],
+    (err, res) => {
+      if (err) {
+        console.error(err);
+        return;
+      }
+      // If no rows were affected by the update, insert a new record
+      if (res.affectedRows === 0) {
+        connection.getConnection().execute(
+          `INSERT INTO holdings (tick, address, amt, updated_at_block) VALUES (?, ?, ?, ?)`,
+          [
+            holding.tick,
+            holding.address,
+            holding.amt,
+            holding.updated_at_block,
+          ],
+          (err) => {
+            if (err) {
+              console.error(err);
+            }
+          }
+        );
+      }
+    }
+  );
 }
