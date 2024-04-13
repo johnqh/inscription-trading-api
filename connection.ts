@@ -4,4 +4,22 @@ import mysql from "mysql2";
 dotenv.config();
 /* the DATABASE_URL variable is always going to be there, so assure that it is
  * fine */
-export default mysql.createConnection(process.env.DATABASE_URL!);
+
+const conn = mysql.createConnection(process.env.DATABASE_URL!);
+
+function select<T extends mysql.RowDataPacket>(query: string, params: String[]): Promise<T[]> {
+  return new Promise((resolve, reject) => {
+    conn.query<T[]>(query, params, (err, res) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(res);
+      }
+    });
+  });
+}
+
+// UniSat API Key. Required to get the holdings
+const apiKey: string = process.env.API_KEY!;
+
+export default {conn, select, apiKey}
