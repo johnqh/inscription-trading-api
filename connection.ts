@@ -41,4 +41,7 @@ function close() {
   conn.end();
 }
 
-export default { connect, getConnection, select, execute, close };
+// UniSat API Key. Required to get the holdings
+const apiKey: string = process.env.API_KEY!;
+
+export default { connect, getConnection, select, execute, close, apiKey };

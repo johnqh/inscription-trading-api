@@ -1,57 +1,32 @@
-import express, { Request, Response } from 'express';
-import { RowDataPacket } from 'mysql2';
-import connection from '../connection';
-
-interface Deploy extends RowDataPacket {
-    tick: string,
-    max: number,
-    lim: number,
-    block: number
-}
+import express, { Request, Response } from "express";
+import connection from "../connection";
+import axios from "axios";
 
 const router = express.Router();
 
-router.get('/', async (_req: Request, res: Response) => {
-  // Open Connection
-  connection.connect();
-  let response: Deploy[] = await connection.select<Deploy>(
-    "SELECT * FROM deploy",
-    []
+router.get("/", async (req: Request, res: Response) => {
+  let data = await axios.get(
+    `https://open-api-testnet.unisat.io/v1/indexer/brc20/list?start=0&limit=75`,
+    { headers: { Authorization: `Bearer ${connection.apiKey}` } }
   );
 
-  connection.close();
-  res.send(response);
-})
+  let output = data.data;
 
-router.post('/', async (req: Request, res: Response) => {
-    const deploy: Deploy = req.body;
+  // Handle error code -2003
+  if (output.code == -2003) {
+    return res
+      .status(500)
+      .send({ error: "API key exceeded quota, try again later" });
+  }
 
-    // Validation
-    if (typeof deploy.max !== 'number' ||
-        typeof deploy.lim !== 'number' ||
-        typeof deploy.block !== 'number' ||
-        typeof deploy.tick !== 'string') {
-        return res.status(400).send({ error: 'Invalid input.' });
-    }
+  output = output.data;
 
-    await addDeploy(deploy);
+  res.send(output.detail);
+});
 
-    res.send({ message: 'Deploy token inserted successfully.', deploy });
-})
+router.post("/", async (req: Request, res: Response) => {
+  // Since we are using the UniSat API for deploy, post is not needed anymore
+  res.send({ message: "Request ignored" });
+});
 
 export default router;
-
-async function addDeploy(deploy: Deploy): Promise<void> {
-  // Open Connection
-  connection.connect();
-  connection.getConnection().execute(
-    `INSERT INTO deploy (tick, max, lim, block) VALUES (?, ?, ?, ?)`,
-    [deploy.tick, deploy.max, deploy.lim, deploy.block],
-    (err) => {
-      if (err) {
-        console.error(err);
-      }
-    }
-  );
-  connection.close();
-}

@@ -628,12 +628,7 @@ async function completeOrder(
 
   let inscription_txid = "";
 
-  // const intervalId = setInterval(()=> {
-
-  //     clearInterval(intervalId);
-
-  // }, 10000);
-
+  // Waiting until UniSat to Inscribe Transfer for the Exchange to then Give yo the Buyer
   while ((inscription_txid = await checkStatus(response.orderId)) == null) {
     console.log("----- Still checking status -----");
     sleep.sleep(10);

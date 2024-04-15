@@ -1,7 +1,6 @@
 import express, { Request, Response } from "express";
 import { RowDataPacket } from "mysql2";
 import connection from "../connection";
-import orderMatching from "../order_matching";
 
 export interface Order extends RowDataPacket {
   id: number;
@@ -72,15 +71,9 @@ router.post("/", async (req: Request, res: Response) => {
   connection.getConnection().execute(
     `INSERT INTO orders (address, tick, side, amt, price, expiration, expired, txid, fulfilled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [address, tick, side, amt, price, expiration, expired, txid, fulfilled],
-    (err, res) => {
-      // orderMatching();
-    }
   );
 
   connection.close();
-
-  // Evoke Order Matching when Order is Placed
-  // orderMatching();
 
   res.send({ message: "Action added successfully." });
 });

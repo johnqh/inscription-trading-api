@@ -8,8 +8,10 @@ import moment from "moment";
 import axios from "axios";
 import completeOrder from "./fulfill_order";
 import { Order } from "./routes/orders";
+import sleep, { msleep } from "sleep";
 
 const apiPrefix = "http://localhost:3000";
+const exchange_wallet = "tb1qeuzkvusgyxekclxwzjl49n9g30ankw60ly2l5m";
 
 const numbersQueue = new MinPriorityQueue<number>();
 
@@ -30,6 +32,10 @@ const getHistoricalRecordValue: IGetCompareValue<HistoricalRecord> = (
 ) => HistoricalRecord.price;
 
 async function orderMatching() {
+   const restURL = `https://blockstream.info/testnet/api/address/${exchange_wallet}/utxo`;
+   const res = await axios.get(restURL);
+   const txids = res.data.map((utxo: any) => utxo.txid);
+
   // Buy/ Sell Queue
   const BuyQueue = new MaxPriorityQueue<HistoricalRecord>(
     getHistoricalRecordValue
@@ -84,22 +90,44 @@ async function orderMatching() {
   console.log("SELL");
   console.log(SellQueue.toArray());
 
+
   while (!BuyQueue.isEmpty()) {
     const bid = BuyQueue.pop();
 
     // Current Size of the Amount of Tokens to Give to Bidder (Amt)
     let remainingTokens = bid.token_size;
     const bidOrder = bid.order;
-    let txid = "";
+    let buy_txid = "";
 
     if (bidOrder && bidOrder.txid) {
-      txid = bidOrder.txid;
+      buy_txid = bidOrder.txid;
+    }
+
+    // The Buyer's Payment is Not in the Exchange Wallet Yet (Transaction Not Confirmed)
+    if (!buy_txid || !txids.includes(buy_txid)) {
+      continue;
     }
 
     delete bid.order; // delete order because it doesn't exist in the Historical Record
 
     while (!SellQueue.isEmpty() && remainingTokens > 0) {
       const ask = SellQueue.front();
+
+      if (ask.token !== bid.token) {
+        continue;
+      }
+
+      const askOrder = ask.order;
+      let ask_txid = "";
+
+      if (askOrder && askOrder.txid) {
+        ask_txid = askOrder.txid;
+      }
+
+      // The Seller's Inscription is Not in the Exchange Wallet Yet (Transaction Not Confirmed)
+      if (!ask_txid || !txids.includes(ask_txid)) {
+        continue;
+      }
 
       if (ask.price > bid.price) {
         asksPending.push(SellQueue.pop());
@@ -143,13 +171,13 @@ async function orderMatching() {
             ${seller.address},
             ${bid.token},
             ${String(seller.token_size)},
-            ${txid}`);
+            ${buy_txid}`);
           completeOrder(
             bid.address,
             seller.address,
             bid.token,
             String(seller.token_size),
-            txid
+            buy_txid
           );
         }
 
@@ -207,7 +235,19 @@ async function orderMatching() {
   asksPending = [];
 }
 
-export default orderMatching;
+async function main()
+{
+  let count = 0;
+
+  while(true){
+    await orderMatching();
+    count += 1;
+    console.log(count);
+    sleep.sleep(10);
+  }
+}
+
+main();
 
 /*
 -------------------- References --------------------
