@@ -105,6 +105,8 @@ async function orderMatching() {
 
     // The Buyer's Payment is Not in the Exchange Wallet Yet (Transaction Not Confirmed)
     if (!buy_txid || !txids.includes(buy_txid)) {
+      console.log("Not in the list");
+      console.log(buy_txid);
       continue;
     }
 
@@ -227,12 +229,8 @@ async function orderMatching() {
     SellQueue.push(ask);
   }
 
-  console.log("----------Sell Queue------------");
-  console.log(SellQueue.toArray());
-
-  console.log("-------Asks Pending------------");
-  console.log(asksPending);
-  asksPending = [];
+  // console.log("----------Sell Queue------------");
+  // console.log(SellQueue.toArray());
 }
 
 async function main()
