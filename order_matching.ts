@@ -32,9 +32,21 @@ const getHistoricalRecordValue: IGetCompareValue<HistoricalRecord> = (
 ) => HistoricalRecord.price;
 
 async function orderMatching() {
-   const restURL = `https://blockstream.info/testnet/api/address/${exchange_wallet}/utxo`;
-   const res = await axios.get(restURL);
-   const txids = res.data.map((utxo: any) => utxo.txid);
+  let orders: Order[] = [];
+  let txids: string[] = [];
+
+  try {
+    const restURL = `https://blockstream.info/testnet/api/address/${exchange_wallet}/utxo`;
+    const res = await axios.get(restURL);
+    txids = res.data.map((utxo: any) => utxo.txid);
+
+    // Load Orders from Database
+    const response = await axios.get(`${apiPrefix}/orders`);
+    orders = response.data;
+  } catch (e) {
+    console.log(e);
+    return;
+  }
 
   // Buy/ Sell Queue
   const BuyQueue = new MaxPriorityQueue<HistoricalRecord>(
@@ -43,10 +55,6 @@ async function orderMatching() {
   const SellQueue = new MaxPriorityQueue<HistoricalRecord>(
     getHistoricalRecordValue
   );
-
-  // Load Orders from Database
-  const response = await axios.get(`${apiPrefix}/orders`);
-  const orders = response.data;
 
   // Populating the Queue
   for (const order of orders) {
@@ -89,7 +97,6 @@ async function orderMatching() {
   console.log(BuyQueue.toArray());
   console.log("SELL");
   console.log(SellQueue.toArray());
-
 
   while (!BuyQueue.isEmpty()) {
     const bid = BuyQueue.pop();
@@ -167,22 +174,6 @@ async function orderMatching() {
 
       // Perform Transfers
       try {
-        for (let seller of asksConsumed) {
-          console.log("SENDING: " + seller.btc_amount);
-          console.log(`${bid.address},
-            ${seller.address},
-            ${bid.token},
-            ${String(seller.token_size)},
-            ${buy_txid}`);
-          completeOrder(
-            bid.address,
-            seller.address,
-            bid.token,
-            String(seller.token_size),
-            buy_txid
-          );
-        }
-
         // Looping through the Seller's the Buyer Consumed
         for (const ask of asksConsumed) {
           let askOrder = ask.order;
@@ -214,6 +205,22 @@ async function orderMatching() {
         await axios.put(`${apiPrefix}/orders/${bidOrder ? bidOrder.id : ""}`, {
           fulfilled: 1,
         });
+
+        for (let seller of asksConsumed) {
+          console.log("SENDING: " + seller.btc_amount);
+          console.log(`${bid.address},
+            ${seller.address},
+            ${bid.token},
+            ${String(seller.token_size)},
+            ${buy_txid}`);
+          completeOrder(
+            bid.address,
+            seller.address,
+            bid.token,
+            String(seller.token_size),
+            buy_txid
+          );
+        }
       } catch (e) {
         console.log(e);
       }
@@ -233,11 +240,10 @@ async function orderMatching() {
   // console.log(SellQueue.toArray());
 }
 
-async function main()
-{
+async function main() {
   let count = 0;
 
-  while(true){
+  while (true) {
     await orderMatching();
     count += 1;
     console.log(count);
