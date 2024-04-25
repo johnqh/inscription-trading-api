@@ -6,13 +6,16 @@ dotenv.config();
  * fine */
 
 let conn: mysql.Connection;
-function connect(): mysql.Connection {
-  conn = mysql.createConnection(process.env.DATABASE_URL!);
-  return conn;
+function connect(): mysql.Connection | undefined {
+  try {
+    conn = mysql.createConnection(process.env.DATABASE_URL!);
+    return conn;
+  } catch (e: any) {
+    console.log(e);
+  }
 }
 
-function getConnection()
-{
+function getConnection() {
   return conn;
 }
 
@@ -29,11 +32,9 @@ function select<T extends mysql.RowDataPacket>(
       }
     });
   });
-  
 }
 
-function execute(sql: string, values: any[])
-{
+function execute(sql: string, values: any[]) {
   conn.execute(sql, values);
 }
 

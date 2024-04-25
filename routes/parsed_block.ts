@@ -1,16 +1,19 @@
-import express, { Request, Response } from 'express';
-import { RowDataPacket } from 'mysql2';
-import connection from '../connection';
+import express, { Request, Response } from "express";
+import { RowDataPacket } from "mysql2";
+import connection from "../connection";
 
 interface ParsedBlock extends RowDataPacket {
-	last_parsed_block: number
+  last_parsed_block: number;
 }
 
 const router = express.Router();
 
-router.get('/', async (_req: Request, res: Response) => {
+router.get("/", async (_req: Request, res: Response) => {
   // Open Connection
-  connection.connect();
+  if (!connection.connect()) {
+    res.send({ message: "Connection failed" });
+    return;
+  }
   let response: ParsedBlock[] = await connection.select<ParsedBlock>(
     "SELECT * FROM parsed_block LIMIT 1",
     []
@@ -26,26 +29,29 @@ router.get('/', async (_req: Request, res: Response) => {
   res.send(response[0]);
 });
 
-router.post('/', async (req: Request, res: Response) => {
-	const request: ParsedBlock = req.body;
-	const last_parsed_block = request.last_parsed_block;
+router.post("/", async (req: Request, res: Response) => {
+  const request: ParsedBlock = req.body;
+  const last_parsed_block = request.last_parsed_block;
 
-	if (!last_parsed_block) {
-		return res.status(400).send({ error: 'Invalid input.' })
-	}
+  if (!last_parsed_block) {
+    return res.status(400).send({ error: "Invalid input." });
+  }
 
-	await setParsedBlock(last_parsed_block);
+  await setParsedBlock(last_parsed_block);
 
-	res.send({
-		message: 'Last parsed block processed successfully.', last_parsed_block
-	});
+  res.send({
+    message: "Last parsed block processed successfully.",
+    last_parsed_block,
+  });
 });
 
 export default router;
 
 async function setParsedBlock(new_val: number) {
   // Open Connection
-  connection.connect();
+  if (!connection.connect()) {
+    return;
+  }
 
   const response: ParsedBlock[] = await connection.select<ParsedBlock>(
     "SELECT * FROM parsed_block LIMIT 1",

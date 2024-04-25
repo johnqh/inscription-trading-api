@@ -10,6 +10,7 @@ const axios = require("axios").default;
 const ECPair = ECPairFactory(ecc);
 bitcoin.initEccLib(ecc);
 
+// ------------------------------ Set Up Testnet Environment ------------------------------
 const env = {
   ["development"]: {
     network: bitcoin.networks.testnet,
@@ -20,13 +21,14 @@ const env = {
 
 const { network, blockStreamApi, explorer } = env["development"];
 
+// ------------------------------ Auxiliary Functions ------------------------------
 /**
- * Prepare wallet from a Wallet Import Format (WIF) private key
- * Each network -> Each address has own private key.
+ * Prepare Wallet from a Wallet Import Format (WIF) Private Key
+ * Each Network -> Each Address has own Private Key.
  */
 export const initKeyPair = (WIF = process.env.WALLET_PRIVATE_KEY) => {
   if (!WIF) throw new Error("WALLET_PRIVATE_KEY is not set");
-  // Decode WIF private key
+  // Decode WIF Private Key
   const keyPair = ECPair.fromWIF(WIF, network);
   return {
     keyPair,
@@ -112,17 +114,21 @@ export const getTaprootP2TR = (
  * Ex: await sendBitcoin('tb1q2fzh9f7ss8eu56fnv2zhr56a0wd3g64xp7d4xk', 'mo1xu79z1354YicBa5EXwMh7HrCAfRdPSW', 1000);
  */
 
+// Creates and Brodcasts a Bitcoin Transaction: Sends BTC
 export const sendBTC = async (
   exchange: string,
   to: string,
   amount: number,
   utxo_txid: string,
-  feeRate = 8,
-  maxFeeRate = 8
+  feeRate = 30,
+  maxFeeRate = 30
 ) => {
+  // ------------------------------ Auxiliary Functions ------------------------------
   const { keyPair } = initKeyPair();
 
-  /// Detect address type
+  // --------------- Auxiliary Functions: Address ---------------
+
+  // Detect Address Type: Their are 4 Adddress Types
   enum AddressType {
     NATIVE_SEGWIT_P2WPKH = "Native Segwit P2WPKH",
     NESTED_SEGWIT_P2SH_P2PKH = "Nested Segwit P2SH_P2PKH",
@@ -138,31 +144,37 @@ export const sendBTC = async (
     return AddressType.LEGACY_P2PKH;
   };
 
-  // This config will be set based on address type
+  // --------------- Auxiliary Functions: Address Type - Sign Payment ---------------
+
+  // This Config will be Set Based on Address Type
   let signer: bitcoin.Signer,
     payment: bitcoin.Payment,
     sender: string | undefined;
 
   const addressType = detectAddressType(exchange);
   switch (addressType) {
+    // ----- Native Segwit P2WPKH -----
     case AddressType.NATIVE_SEGWIT_P2WPKH: {
       signer = keyPair;
       payment = getNativeSegwitP2WPKH(keyPair.publicKey);
       sender = payment.address;
       break;
     }
+    // ----- Nested Segwit P2SH(P2WPKH) -----
     case AddressType.NESTED_SEGWIT_P2SH_P2PKH: {
       signer = keyPair;
       payment = getNestedSegwitP2SH_P2WPKH(keyPair.publicKey);
       sender = payment.address;
       break;
     }
+    // ----- Legacy P2PKH -----
     case AddressType.LEGACY_P2PKH: {
       signer = keyPair;
       payment = getLegacyP2PKH(keyPair.publicKey);
       sender = payment.address;
       break;
     }
+    // ----- Taproot P2TR -----
     case AddressType.TAPROOT_P2TR: {
       const taprootP2TR = getTaprootP2TR(keyPair);
       signer = taprootP2TR.signer;
@@ -179,6 +191,7 @@ export const sendBTC = async (
     );
   }
 
+  // --------------- Auxiliary Functions: UTXO ---------------
   interface IUTXO {
     txid: string;
     vout: number;
@@ -197,6 +210,7 @@ export const sendBTC = async (
     return res.data;
   };
 
+  // --------------- Auxiliary Function: Brodcast Transaction on Bitcoin Blockchain ---------------
   const broadcast = async (txHex: string) => {
     try {
       console.log("Broadcasting tx:", txHex);
@@ -213,7 +227,7 @@ export const sendBTC = async (
 
   const totalUnspent = utxos.reduce((sum, { value }) => sum + value, 0);
 
-  // Build transaction
+  // --------------- Auxiliary Function: Build Transaction ---------------
   const estimateFee = (
     signer: any,
     psbt: any,
@@ -297,32 +311,36 @@ export const sendBTC = async (
   // Change of the Transaction goes to the Exchange Wallet which is the 1% of the Exchange Fee
   psbt.addOutput({ address: sender, value: remainBal - finalFee });
 
-  // Sign transaction
+  // Sign Transaction
   psbt.signAllInputs(signer);
   psbt.finalizeAllInputs();
 
   console.log("inputs: " + psbt.txInputs.map((input) => input.hash));
   console.log("output: " + psbt.txOutputs.map((output) => output.value));
 
-  // Broadcast transaction
+  // Broadcast Transaction
   const tx = psbt.extractTransaction(true);
   const txId = await broadcast(tx.toHex());
   txId && console.log(`Transaction successfully broadcasted! TxId is ${txId}`);
   return txId;
 };
 
-export const fulfillOrder = async (
+// Creates and Brodcasts a Bitcoin Transaction: Sends Inscription to Buyer, BTC to Seller, and 1% to Exchange
+const fulfillOrder = async (
   exchange: string,
   buyer: string,
   seller: string,
   brc_utxo_txid: string,
   btc_utxo_txid: string,
-  feeRate = 8,
-  maxFeeRate = 8
+  feeRate = 30,
+  maxFeeRate = 30
 ) => {
+  // ------------------------------ Auxiliary Functions ------------------------------
   const { keyPair } = initKeyPair();
 
-  /// Detect address type
+  // --------------- Auxiliary Functions: Address ---------------
+
+  // Detect Address Type: Their are 4 Adddress Types
   enum AddressType {
     NATIVE_SEGWIT_P2WPKH = "Native Segwit P2WPKH",
     NESTED_SEGWIT_P2SH_P2PKH = "Nested Segwit P2SH_P2PKH",
@@ -338,7 +356,9 @@ export const fulfillOrder = async (
     return AddressType.LEGACY_P2PKH;
   };
 
-  // This config will be set based on address type
+  // --------------- Auxiliary Functions: Address Type - Sign Payment ---------------
+
+  // This Config will be Set Based on Address Type
   let signer: bitcoin.Signer,
     payment: bitcoin.Payment,
     sender: string | undefined;
@@ -379,6 +399,7 @@ export const fulfillOrder = async (
     );
   }
 
+  // --------------- Auxiliary Functions: UTXO ---------------
   interface IUTXO {
     txid: string;
     vout: number;
@@ -397,6 +418,7 @@ export const fulfillOrder = async (
     return res.data;
   };
 
+  // --------------- Auxiliary Function: Brodcast Transaction on Bitcoin Blockchain ---------------
   const broadcast = async (txHex: string) => {
     try {
       console.log("Broadcasting tx:", txHex);
@@ -413,7 +435,7 @@ export const fulfillOrder = async (
 
   const totalUnspent = utxos.reduce((sum, { value }) => sum + value, 0);
 
-  // Build transaction
+  // --------------- Auxiliary Function: Build Trnsaction ---------------
   const estimateFee = (
     signer: any,
     psbt: any,
@@ -441,6 +463,7 @@ export const fulfillOrder = async (
   let brc_utxo_amount: number = 0;
   let btc_utxo_amount: number = 0;
 
+  // Loop thorugh UTXOs
   for (const utxo of utxos) {
     // BRC-20 UXTO (Buyer) & BTC UXTO (Seller, Covers both Miner's Fee)
     if (utxo.txid !== brc_utxo_txid && utxo.txid !== btc_utxo_txid) {
@@ -516,29 +539,32 @@ export const fulfillOrder = async (
   // Change of the Transaction goes to the Exchange Wallet which is the 1% of the Exchange Fee
   psbt.addOutput({ address: sender, value: remainBal - finalFee });
 
-  // Sign transaction
+  // Sign Transaction
   psbt.signAllInputs(signer);
   psbt.finalizeAllInputs();
 
   console.log("inputs: " + psbt.txInputs.map((input) => input.hash));
   console.log("output: " + psbt.txOutputs.map((output) => output.value));
 
-  // Broadcast transaction
+  // Broadcast Transaction
   const tx = psbt.extractTransaction(true);
   const txId = await broadcast(tx.toHex());
   txId && console.log(`Transaction successfully broadcasted! TxId is ${txId}`);
+  return txId;
 };
 
+const exchange_wallet = process.env.EXCHANGE_WALLET || "";
 const apiKey = process.env.REACT_APP_API_KEY || "";
 const apiPrefix = "https://open-api-testnet.unisat.io";
 
+// Need to Inscribe Transfer First Before Transferring It
 async function placeInscriptionOrder(tick: string, amount: string) {
   try {
     const response = await axios.post(
       apiPrefix + "/v2/inscribe/order/create/brc20-transfer",
       {
-        receiveAddress: "tb1qeuzkvusgyxekclxwzjl49n9g30ankw60ly2l5m",
-        feeRate: 10,
+        receiveAddress: exchange_wallet,
+        feeRate: 30,
         outputValue: 546,
         devAddress: "",
         devFee: 0,
@@ -560,6 +586,7 @@ async function placeInscriptionOrder(tick: string, amount: string) {
   }
 }
 
+// Checks the Status of our Order from UniSat - Inscribe Transfer
 async function checkStatus(orderID: string) {
   try {
     let response = await axios.get(
@@ -572,10 +599,14 @@ async function checkStatus(orderID: string) {
       }
     );
 
+    // Testing Purposes
     console.log("----- RESPONSE DATA -----");
     console.log(response.data);
+
+    // Status has 3 Phases: Pending, Inscribing, Minted
     let status = response.data.data.status;
 
+    // Inscription is Now Transferable
     if (status == "minted") {
       let inscriptionID = response.data.data.files[0].inscriptionId;
       let res = await axios.get(
@@ -588,6 +619,7 @@ async function checkStatus(orderID: string) {
         }
       );
 
+      // TXID: Needed to Send from Exchange => Buyer
       console.log(res.data.data.utxo.txid);
       return res.data.data.utxo.txid;
     } else {
@@ -599,8 +631,7 @@ async function checkStatus(orderID: string) {
   }
 }
 
-const exchange_wallet = "tb1qeuzkvusgyxekclxwzjl49n9g30ankw60ly2l5m";
-
+// Sends Inscription to Buyer, BTC to Seller, and 1% to Exchange
 async function completeOrder(
   buyer: string,
   seller: string,
@@ -608,14 +639,21 @@ async function completeOrder(
   amount: string,
   utxo_txid: string
 ) {
+  // Testing Purposes
   console.log("HERE");
   console.log(utxo_txid);
 
+  // Inscribe Transfer Order to UniSat
   const response: any = await placeInscriptionOrder(tick, amount);
+
+  // Testing Purposes
   console.log("----- RESPONSE FROM UNISAT -----");
   console.log(response);
+
+  // UniSat Address we Pay for our Inscribe Transfer Order
   const unisat = response.payAddress;
 
+  // Send Payment to UniSat
   const inscription_change_txid = await sendBTC(
     exchange_wallet,
     unisat,
@@ -623,12 +661,13 @@ async function completeOrder(
     utxo_txid
   );
 
+  // Testing Purposes
   console.log("----- INSCRIPTION CHANGE FROM UNISAT INSCRIPTION FEE -----");
   console.log(inscription_change_txid);
 
   let inscription_txid = "";
 
-  // Waiting until UniSat to Inscribe Transfer for the Exchange to then Give yo the Buyer
+  // Waiting for our UniSat Inscribe Transfer Order to be Ready (minted)
   while ((inscription_txid = await checkStatus(response.orderId)) == null) {
     console.log("----- Still checking status -----");
     sleep.sleep(10);
@@ -643,7 +682,7 @@ async function completeOrder(
   );
 }
 
-export default completeOrder;
+export { placeInscriptionOrder, checkStatus, fulfillOrder, completeOrder };
 
 /*
 ------- References ----

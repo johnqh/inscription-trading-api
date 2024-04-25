@@ -1,19 +1,19 @@
-import express, { Request, Response } from 'express';
-import { RowDataPacket } from 'mysql2';
-import connection from '../connection';
+import express, { Request, Response } from "express";
+import { RowDataPacket } from "mysql2";
+import connection from "../connection";
 
 interface Action extends RowDataPacket {
-	address: string,
-	tick: string,
-	action: number,
-	amt: number,
-	destination?: string,
-	block: number
+  address: string;
+  tick: string;
+  action: number;
+  amt: number;
+  destination?: string;
+  block: number;
 }
 
 const router = express.Router();
 
-router.get('/', async (req: Request, res: Response) => {
+router.get("/", async (req: Request, res: Response) => {
   // check query string
   let addr = req.query.address;
   let tick = req.query.tick;
@@ -39,7 +39,10 @@ router.get('/', async (req: Request, res: Response) => {
   }
 
   // Open Connection
-  connection.connect();
+  if (!connection.connect()) {
+    res.send([]);
+    return;
+  }
 
   let response: Action[] = await connection.select<Action>(query, params);
 
@@ -47,63 +50,72 @@ router.get('/', async (req: Request, res: Response) => {
   res.send(response);
 });
 
-router.post('/', async (req: Request, res: Response) => {
-	const action: Action = req.body;
+router.post("/", async (req: Request, res: Response) => {
+  const action: Action = req.body;
 
-	// Validation
-	if (typeof action.tick !== 'string' ||
-		typeof action.address !== 'string' ||
-		typeof action.action !== 'number' ||
-		typeof action.amt !== 'number' ||
-		typeof action.block !== 'number' ||
-		(action.destination && typeof action.destination !== 'string')) {
-		return res.status(400).send({ error: 'Invalid input.' });
-	}
+  // Validation
+  if (
+    typeof action.tick !== "string" ||
+    typeof action.address !== "string" ||
+    typeof action.action !== "number" ||
+    typeof action.amt !== "number" ||
+    typeof action.block !== "number" ||
+    (action.destination && typeof action.destination !== "string")
+  ) {
+    return res.status(400).send({ error: "Invalid input." });
+  }
 
-	await addAction(action);
+  await addAction(action);
 
-	res.send({ message: 'Action added successfully.', request: action });
-})
+  res.send({ message: "Action added successfully.", request: action });
+});
 
 export default router;
 
 async function addAction(request: Action): Promise<void> {
+ 
   // Open Connection
-  connection.connect();
+  if (!connection.connect()) {
+    return;
+  }
   // Allow nullable destination
   if (request.destination) {
-    connection.getConnection().execute(
-      `INSERT INTO actions (address, tick, action, amt, destination, block) VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        request.address,
-        request.tick,
-        request.action,
-        request.amt,
-        request.destination,
-        request.block,
-      ],
-      (err) => {
-        if (err) {
-          console.error(err);
+    connection
+      .getConnection()
+      .execute(
+        `INSERT INTO actions (address, tick, action, amt, destination, block) VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          request.address,
+          request.tick,
+          request.action,
+          request.amt,
+          request.destination,
+          request.block,
+        ],
+        (err) => {
+          if (err) {
+            console.error(err);
+          }
         }
-      }
-    );
+      );
   } else {
-    connection.getConnection().execute(
-      `INSERT INTO actions (address, tick, action, amt, block) VALUES (?, ?, ?, ?, ?)`,
-      [
-        request.address,
-        request.tick,
-        request.action,
-        request.amt,
-        request.block,
-      ],
-      (err) => {
-        if (err) {
-          console.error(err);
+    connection
+      .getConnection()
+      .execute(
+        `INSERT INTO actions (address, tick, action, amt, block) VALUES (?, ?, ?, ?, ?)`,
+        [
+          request.address,
+          request.tick,
+          request.action,
+          request.amt,
+          request.block,
+        ],
+        (err) => {
+          if (err) {
+            console.error(err);
+          }
         }
-      }
-    );
+      );
   }
 
   connection.close();

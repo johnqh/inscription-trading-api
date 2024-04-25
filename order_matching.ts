@@ -6,12 +6,18 @@ import {
 import moment from "moment";
 
 import axios from "axios";
-import completeOrder from "./fulfill_order";
+import {
+  placeInscriptionOrder,
+  completeOrder,
+  checkStatus,
+  fulfillOrder,
+  sendBTC,
+} from "./fulfill_order";
 import { Order } from "./routes/orders";
-import sleep, { msleep } from "sleep";
+import sleep from "sleep";
 
 const apiPrefix = "http://localhost:3000";
-const exchange_wallet = "tb1qeuzkvusgyxekclxwzjl49n9g30ankw60ly2l5m";
+const exchange_wallet = process.env.EXCHANGE_WALLET || "";
 
 const numbersQueue = new MinPriorityQueue<number>();
 
@@ -187,7 +193,21 @@ async function orderMatching() {
             if (ask.token_size < askOrder.amt) {
               // Update Amount of Last Order if It was Not All used up by the Buyer
               await axios.put(`${apiPrefix}/orders/${askOrder.id}`, {
+                amt: ask.token_size,
+              });
+
+              // Split Seller's Order into Two
+              await axios.post(`${apiPrefix}/orders/${askOrder.id}`, {
                 amt: askOrder.amt - ask.token_size,
+                address: askOrder.addresss,
+                tick: askOrder.tick,
+                side: askOrder.side,
+                price: askOrder.price,
+                expiration: askOrder.expiration,
+                expired: askOrder.expired,
+                txid: askOrder.txid,
+                fulfilled: 0,
+
               });
             } else {
               // Update Fulfilled to True to Avoid Reprcossing old Orders
@@ -213,13 +233,15 @@ async function orderMatching() {
             ${bid.token},
             ${String(seller.token_size)},
             ${buy_txid}`);
-          completeOrder(
-            bid.address,
-            seller.address,
-            bid.token,
-            String(seller.token_size),
-            buy_txid
-          );
+
+          // Update Match Fulfillment to Begin the Process of Fulfilling the Order
+          await axios.post(`${apiPrefix}/match_fulfillment`, {
+            buyer_order: bidOrder ? bidOrder.id : 0,
+            seller_order: seller.order ? seller.order.id : 0,
+            unisat_txid: null,
+            unisat_order_id: null,
+            fulfillment_txid: null,
+          });
         }
       } catch (e) {
         console.log(e);
@@ -236,8 +258,102 @@ async function orderMatching() {
     SellQueue.push(ask);
   }
 
-  // console.log("----------Sell Queue------------");
-  // console.log(SellQueue.toArray());
+  // Create & Broadcast Transactions
+  await processOngoingMatches(txids);
+}
+
+// Creates & Broadcast Transactions for Orders that are Matched
+async function processOngoingMatches(uxtos: string[]) {
+  try {
+    // Entire List of Previously Matched Orders
+    const response = await axios.get(`${apiPrefix}/match_fulfillment`);
+    const matches = response.data;
+
+    // Looping through Each Match (Buyer & Seller)
+    for (const match of matches) {
+
+      // Order has Been Completed so Don't Bother Processing Again
+      if (match.completed_order) {
+        continue;
+      }
+      // Retrieving Buyer's Order Information
+      let buyer_order = await axios.get(
+        `${apiPrefix}/orders?id=${match.buyer_order}`
+      )[0];
+
+      // Retrieving Seller's Order Information
+      let seller_order = await axios.get(
+        `${apiPrefix}/orders?id=${match.seller_order}`
+      )[0];
+
+      // UniSat Order ID Used to Cehck on Inscription Status ONLY
+      if (!match.unisat_order_id) {
+        
+        // No Order ID so Place Inscription Order
+        const data = await placeInscriptionOrder(
+          seller_order.tick,
+          seller_order.amt
+        );
+
+        // UniSat Address we Pay for our Inscribe Transfer Order
+        const unisat = data.payAddress;
+
+        // Send Payment to UniSat
+        const inscription_change_txid = await sendBTC(
+          exchange_wallet,
+          unisat,
+          data.amount,
+          buyer_order.txid
+        );
+
+        await axios.put(`${apiPrefix}/match_fulfillment/${match.id}`, {
+          unisat_order_id: data.orderId,
+          inscription_change_txid: inscription_change_txid,
+        });
+      } else if (!match.unisat_txid) {
+        // TXID: UniSat ==> Exchange (Inscription)
+        let txid = await checkStatus(match.unisat_order_id);
+
+        if (txid) {
+          await axios.put(`${apiPrefix}/match_fulfillment/${match.id}`, {
+            unisat_txid: txid,
+          });
+        }
+      } else if (!match.fulfillment_txid) {
+        // Need Inscription & The Change to Pay Everybody (Buer & Seller)
+        if (
+          uxtos.includes(match.unisat_txid) &&
+          uxtos.includes(match.inscription_change_txid)
+        ) {
+          let txid = await fulfillOrder(
+            exchange_wallet,
+            buyer_order.address,
+            seller_order.address,
+            match.unisat_txid,
+            match.inscription_change_txid
+          );
+
+          // TXID of Entire Transaction (Exchange, Seller, Buyer)
+          await axios.put(`${apiPrefix}/match_fulfillment/${match.id}`, {
+            fulfillment_txid: txid,
+          });
+        }
+      } else if (!match.completed_order) {
+        const restURL = `https://blockstream.info/testnet/api/address/${buyer_order.address}/utxo`;
+        const res = await axios.get(restURL);
+        let txids = res.data.map((utxo: any) => utxo.txid);
+
+        // Buyer has TXID in his Wallet Thus Transaction went Through
+        if (txids.includes(match.fulfillment_txid)) {
+          await axios.put(`${apiPrefix}/match_fulfillment/${match.id}`, {
+            completed_order: 1,
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.log(e);
+  }
 }
 
 async function main() {

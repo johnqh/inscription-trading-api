@@ -6,6 +6,10 @@ import actions from "./routes/actions";
 import holdings from "./routes/holdings";
 import deploy from "./routes/deploy";
 import historical_records from "./routes/historical_records";
+import nft_orders from "./routes/nft_orders";
+import nft_historical_records from "./routes/nft_historical_records";
+import match_fulfillment from "./routes/match_fulfillment";
+
 
 // Get address for MySQL server
 dotenv.config();
@@ -36,6 +40,9 @@ app.use("/holdings", holdings);
 app.use("/deploy", deploy);
 app.use("/orders", orders);
 app.use("/historical_records", historical_records);
+app.use("/nft_orders", nft_orders);
+app.use("/nft_historical_records", nft_historical_records);
+app.use("/match_fulfillment", match_fulfillment);
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);

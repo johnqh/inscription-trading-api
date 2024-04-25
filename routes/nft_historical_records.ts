@@ -2,15 +2,16 @@ import express, { Request, Response } from "express";
 import { RowDataPacket } from "mysql2";
 import connection from "../connection";
 
-interface HistoricalRecord extends RowDataPacket {
+interface NftHistoricalRecord extends RowDataPacket {
   id: number;
   address: string;
   action: string;
-  token_size: number;
-  token: string;
-  price?: number;
+  txid: string;
+  inscription_id: string;
+  inscription_number: string;
+  name: string;
+  price: number;
   fee?: number;
-  btc_amount?: number;
   datetime: string;
 }
 
@@ -20,7 +21,7 @@ router.get("/", async (req: Request, res: Response) => {
   // check query string
   let addr = req.query.address;
 
-  let query: string = "SELECT * FROM historical_records";
+  let query: string = "SELECT * FROM nft_historical_records";
   const params: String[] = [];
 
   if (addr) {
@@ -34,10 +35,8 @@ router.get("/", async (req: Request, res: Response) => {
     return;
   }
 
-  const rows: HistoricalRecord[] = await connection.select<HistoricalRecord>(
-    query,
-    params
-  );
+  const rows: NftHistoricalRecord[] =
+    await connection.select<NftHistoricalRecord>(query, params);
 
   connection.close();
 
@@ -45,40 +44,21 @@ router.get("/", async (req: Request, res: Response) => {
 });
 
 router.post("/", async (req: Request, res: Response) => {
-  const {
-    address,
-    action,
-    token_size,
-    token,
-    price,
-    fee,
-    btc_amount,
-    datetime,
-  } = req.body;
-
   // handle optional fields
-  let query: string =
-    "INSERT INTO historical_records (address, action, token_size, token, datetime";
-  let values = "VALUES (?, ?, ?, ?, ?";
-  let params: any[] = [address, action, token_size, token, datetime];
+  let query: string = "INSERT INTO nft_historical_records (";
+  let values = "VALUES (";
 
-  if (price) {
-    query += ", price";
-    values += ", ?";
-    params.push(price);
+  let params: any[] = [];
+
+  for (const attr in req.body) {
+    query += attr + ", ";
+    values += "?, ";
+    params.push(req.body[attr]);
   }
 
-  if (fee) {
-    query += ", fee";
-    values += ", ?";
-    params.push(fee);
-  }
-
-  if (btc_amount) {
-    query += ", btc_amount";
-    values += ", ?";
-    params.push(btc_amount);
-  }
+  // Remove the Last Comma & Space
+  query = query.slice(0, -2);
+  values = values.slice(0, -2);
 
   query += ") " + values + ")";
 
@@ -98,37 +78,35 @@ router.post("/", async (req: Request, res: Response) => {
 router.put("/:id", async (req: Request, res: Response) => {
   const id = Number(req.params.id);
   if (!id) {
-    return res.status(400).send({ error: "Record id not provided" });
+    return res
+      .status(400)
+      .send({ error: "Nft Historical Record id not provided" });
+  }
+  console.log(id);
+
+  let sql = "UPDATE nft_historical_records SET ";
+  let values: any[] = [];
+
+  for (const attr in req.body) {
+    sql += attr + " = ?, ";
+    values.push(req.body[attr]);
   }
 
-  const {
-    address,
-    action,
-    token_size,
-    token,
-    price,
-    fee,
-    btc_amount,
-    datetime,
-  } = req.body;
-  let query: string =
-    "UPDATE orders SET address = ?, action = ?, token_size = ?, token = ?, price = ?, fee = ?, btc_amount = ?, datetime = ? WHERE id = ?";
+  // Remove the Last Comma & Space
+  sql = sql.slice(0, -2);
+
+  sql += " WHERE id = ?";
+
+  values.push(id);
+  console.log(sql);
+  console.log(values);
 
   // Open Connection
   if (!connection.connect()) {
     res.send({ message: "Connection failed" });
     return;
   }
-  connection.execute(query, [
-    address,
-    action,
-    token_size,
-    token,
-    price,
-    fee,
-    btc_amount,
-    datetime,
-  ]);
+  connection.execute(sql, values);
   connection.close();
 
   res.send({ message: "Record added" });
@@ -145,7 +123,7 @@ router.delete("/:id", async (req: Request, res: Response) => {
     res.send({ message: "Connection failed" });
     return;
   }
-  connection.execute("DELETE FROM historical_records WHERE id = ?", [id]);
+  connection.execute("DELETE FROM nft_historical_records WHERE id = ?", [id]);
   connection.close();
 
   res.send({ message: "Record deleted" });
