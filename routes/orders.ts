@@ -63,17 +63,23 @@ router.get("/", async (req: Request, res: Response) => {
 });
 
 router.post("/", async (req: Request, res: Response) => {
-  const {
-    address,
-    tick,
-    side,
-    amt,
-    price,
-    expiration,
-    expired,
-    txid,
-    fulfilled,
-  } = req.body;
+  // handle optional fields
+  let query: string = "INSERT INTO orders (";
+  let values = "VALUES (";
+
+  let params: any[] = [];
+
+  for (const attr in req.body) {
+    query += attr + ", ";
+    values += "?, ";
+    params.push(req.body[attr]);
+  }
+
+  // Remove the Last Comma & Space
+  query = query.slice(0, -2);
+  values = values.slice(0, -2);
+
+  query += ") " + values + ")";
 
   // Open Connection
   if (!connection.connect()) {
@@ -81,17 +87,11 @@ router.post("/", async (req: Request, res: Response) => {
     return;
   }
 
-  // Validate input as needed
-  connection
-    .getConnection()
-    .execute(
-      `INSERT INTO orders (address, tick, side, amt, price, expiration, expired, txid, fulfilled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [address, tick, side, amt, price, expiration, expired, txid, fulfilled]
-    );
+  connection.execute(query, params);
 
   connection.close();
 
-  res.send({ message: "Action added successfully." });
+  res.send({ message: "Order added" });
 });
 
 // PUT Modify an Order Record Given its ID
@@ -129,7 +129,7 @@ router.put("/:id", async (req: Request, res: Response) => {
 
   connection.close();
 
-  res.send({ message: "Action added successfully." });
+  res.send({ message: "Order added successfully." });
 });
 
 export default router;

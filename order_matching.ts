@@ -207,7 +207,6 @@ async function orderMatching() {
                 expired: askOrder.expired,
                 txid: askOrder.txid,
                 fulfilled: 0,
-
               });
             } else {
               // Update Fulfilled to True to Avoid Reprcossing old Orders
@@ -260,6 +259,7 @@ async function orderMatching() {
 
   // Create & Broadcast Transactions
   await processOngoingMatches(txids);
+  await processNftOrders(txids);
 }
 
 // Creates & Broadcast Transactions for Orders that are Matched
@@ -271,7 +271,6 @@ async function processOngoingMatches(uxtos: string[]) {
 
     // Looping through Each Match (Buyer & Seller)
     for (const match of matches) {
-
       // Order has Been Completed so Don't Bother Processing Again
       if (match.completed_order) {
         continue;
@@ -288,7 +287,6 @@ async function processOngoingMatches(uxtos: string[]) {
 
       // UniSat Order ID Used to Cehck on Inscription Status ONLY
       if (!match.unisat_order_id) {
-        
         // No Order ID so Place Inscription Order
         const data = await placeInscriptionOrder(
           seller_order.tick,
@@ -346,6 +344,52 @@ async function processOngoingMatches(uxtos: string[]) {
         // Buyer has TXID in his Wallet Thus Transaction went Through
         if (txids.includes(match.fulfillment_txid)) {
           await axios.put(`${apiPrefix}/match_fulfillment/${match.id}`, {
+            completed_order: 1,
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.log(e);
+  }
+}
+
+async function processNftOrders(uxtos: string[]) {
+  try {
+    const response = await axios.get(`${apiPrefix}/nft_orders`);
+    const orders = response.data;
+
+    for (const order of orders) {
+      if (
+        !order.seller_txid ||
+        !uxtos.includes(order.seller_txid) ||
+        !order.buyer_txid ||
+        !uxtos.includes(order.buyer_txid)
+      ) {
+        continue;
+      }
+
+      if (!order.fulfilled) {
+        // NFT -> Buyer, BTC -> Seller, 1% -> Exchange
+        await fulfillOrder(
+          exchange_wallet,
+          order.buyer_address,
+          order.seller_address,
+          order.seller_txid,
+          order.buyer_txid
+        );
+
+        await axios.put(`${apiPrefix}/nft_orders/${order.id}`, {
+          fulfilled: 1,
+        });
+      } else if (order.fulfillment_txid && !order.completed_order) {
+        const restURL = `https://blockstream.info/testnet/api/address/${order.buyer_address}/utxo`;
+        const res = await axios.get(restURL);
+        let txids = res.data.map((utxo: any) => utxo.txid);
+
+        // Buyer has TXID in his Wallet Thus Transaction went Through
+        if (txids.includes(order.fulfillment_txid)) {
+          await axios.put(`${apiPrefix}/match_fulfillment/${order.id}`, {
             completed_order: 1,
           });
         }
