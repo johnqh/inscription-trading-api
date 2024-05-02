@@ -5,7 +5,7 @@
     "body-parser": "^1.20.2",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "mysql2": "^3.9.4",
+    "mysql2": "^3.9.7",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.3"
   },
