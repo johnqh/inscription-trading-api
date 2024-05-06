@@ -9,7 +9,7 @@
     "express": "^4.19.2",
     "fs": "^0.0.1-security",
     "moment": "^2.30.1",
-    "mysql2": "^3.9.4",
+    "mysql2": "^3.9.7",
     "sleep": "^6.3.0",
     "tiny-secp256k1": "^2.2.3",
     "ts-node": "^10.9.2",
