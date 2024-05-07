@@ -1,7 +1,8 @@
 # inscription-trading-api
 
 This API provides a JSON-based interface with a MySQL database to store
-indexing information, orders, and records.
+indexing information, orders, and records for the BRC-20 inscription trading system.
+It also includes an order matching system so that orders in the order book can be fulfilled.
 
 ## Database setup
 
