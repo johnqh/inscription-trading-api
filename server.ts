@@ -47,3 +47,8 @@ app.use("/match_fulfillment", match_fulfillment);
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });
+
+/*
+References
+https://blog.stackademic.com/mastering-express-middleware-a-guide-to-body-parser-for-html-form-handling-d7ac91a9ccd8?gi=80f6ce56b9da
+*/
