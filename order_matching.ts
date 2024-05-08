@@ -128,6 +128,7 @@ async function orderMatching() {
       const ask = SellQueue.front();
 
       if (ask.token !== bid.token) {
+        asksPending.push(SellQueue.pop());
         continue;
       }
 
@@ -140,6 +141,7 @@ async function orderMatching() {
 
       // The Seller's Inscription is Not in the Exchange Wallet Yet (Transaction Not Confirmed)
       if (!ask_txid || !txids.includes(ask_txid)) {
+        asksPending.push(SellQueue.pop());
         continue;
       }
 
@@ -198,7 +200,7 @@ async function orderMatching() {
               });
 
               // Split Seller's Order into Two
-              await axios.post(`${apiPrefix}/orders/${askOrder.id}`, {
+              await axios.post(`${apiPrefix}/orders/`, {
                 amt: askOrder.amt - ask.token_size,
                 address: askOrder.addresss,
                 tick: askOrder.tick,
