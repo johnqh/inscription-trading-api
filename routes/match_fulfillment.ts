@@ -2,69 +2,42 @@ import express, { Request, Response } from "express";
 import { RowDataPacket } from "mysql2";
 import connection from "../connection";
 
-export interface Order extends RowDataPacket {
+interface MatchFulfillment extends RowDataPacket {
   id: number;
-  address: string;
-  tick: string;
-  side: number;
-  amt: number;
-  price: number;
-  expiration: number;
-  expired: number;
-  txid: string;
-  fulfilled: number;
+  buyer_order: number;
+  seller_order: number;
+  unisat_txid: string;
+  unisat_order_id: string;
+  fulfillment_txid: string;
+  inscription_change_txid: string;
+  completed_order: number;
 }
 
 const router = express.Router();
 
 router.get("/", async (req: Request, res: Response) => {
-  // check query string
-  let addr = req.query.address;
-  let tick = req.query.tick;
-  let id = req.query.id;
-
-  // Retrieving Orders from SQL Table
-  let query: string = "SELECT * FROM orders";
-  const conditions: string[] = [];
-  const params: string[] = [];
-
-  // Adding Filters if Specify by the App
-  if (addr) {
-    conditions.push("address = ?");
-    params.push(`${addr}`);
-  }
-
-  // Adding Filters if Specify by the App
-  if (tick) {
-    conditions.push("tick = ?");
-    params.push(`${tick}`);
-  }
-
-  // Getting a Single Order Record
-  if (id) {
-    conditions.push("id = ?");
-    params.push(`${id}`);
-  }
-
-  // Adding Filters to the Query String
-  if (conditions.length) {
-    query += " WHERE " + conditions.join(" AND ");
-  }
+  let query: string = "SELECT * FROM match_fulfillment";
+  const params: String[] = [];
 
   // Open Connection
   if (!connection.connect()) {
-    res.send([]);
+    res.send({ message: "Connection failed" });
     return;
   }
 
-  // Retrieving Order Records in an Array
-  const rows: Order[] = await connection.select<Order>(query, params);
+  const rows: MatchFulfillment[] = await connection.select<MatchFulfillment>(
+    query,
+    params
+  );
+
+  connection.close();
+
   res.send(rows);
 });
 
 router.post("/", async (req: Request, res: Response) => {
   // handle optional fields
-  let query: string = "INSERT INTO orders (";
+  let query: string = "INSERT INTO match_fulfillment (";
   let values = "VALUES (";
 
   let params: any[] = [];
@@ -91,19 +64,17 @@ router.post("/", async (req: Request, res: Response) => {
 
   connection.close();
 
-  res.send({ message: "Order added" });
+  res.send({ message: "Match added" });
 });
 
-// PUT Modify an Order Record Given its ID
 router.put("/:id", async (req: Request, res: Response) => {
-  console.log(req.body);
   const id = Number(req.params.id);
   if (!id) {
-    return res.status(400).send({ error: "Order id not provided" });
+    return res.status(400).send({ error: "Match fulfillment id not provided" });
   }
   console.log(id);
 
-  let sql = "UPDATE orders SET ";
+  let sql = "UPDATE match_fulfillment SET ";
   let values: any[] = [];
 
   for (const attr in req.body) {
@@ -126,10 +97,26 @@ router.put("/:id", async (req: Request, res: Response) => {
     return;
   }
   connection.execute(sql, values);
-
   connection.close();
 
-  res.send({ message: "Order added successfully." });
+  res.send({ message: "Match updated" });
+});
+
+router.delete("/:id", async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!id) {
+    return res.status(400).send({ error: "Match fulfillment id not provided" });
+  }
+
+  // Open Connection
+  if (!connection.connect()) {
+    res.send({ message: "Connection failed" });
+    return;
+  }
+  connection.execute("DELETE FROM match_fulfillment WHERE id = ?", [id]);
+  connection.close();
+
+  res.send({ message: "Match deleted" });
 });
 
 export default router;

@@ -1,97 +1,133 @@
-import express, { Request, Response } from 'express';
-import { RowDataPacket } from 'mysql2';
-import connection from '../connection';
+import express, { Request, Response } from "express";
+import { RowDataPacket } from "mysql2";
+import connection from "../connection";
 
 interface HistoricalRecord extends RowDataPacket {
-	id: number,
-	address: string,
-	action: string,
-	token_size: number,
-	token: string,
-	price?: number,
-	fee?: number,
-	btc_amount?: number,
-	datetime: string
+  id: number;
+  address: string;
+  action: string;
+  token_size: number;
+  token: string;
+  price?: number;
+  fee?: number;
+  btc_amount?: number;
+  datetime: string;
 }
 
 const router = express.Router();
 
-router.get('/', async (req: Request, res: Response) => {
-	// check query string
-	let addr = req.query.address;
+router.get("/", async (req: Request, res: Response) => {
+  // check query string
+  let addr = req.query.address;
 
-	let query: string = "SELECT * FROM historical_records";
-	const params: String[] = [];
+  let query: string = "SELECT * FROM historical_records";
+  const params: String[] = [];
 
-	if (addr) {
-		query += " WHERE address = ?";
-		params.push(`${addr}`);
-	}
+  if (addr) {
+    query += " WHERE address = ?";
+    params.push(`${addr}`);
+  }
 
-	const rows: HistoricalRecord[] = await connection.select<HistoricalRecord>(query, params);
-	res.send(rows);
+  // Open Connection
+  if (!connection.connect()) {
+    res.send({ message: "Connection failed" });
+    return;
+  }
+
+  const rows: HistoricalRecord[] = await connection.select<HistoricalRecord>(
+    query,
+    params
+  );
+
+  connection.close();
+
+  res.send(rows);
 });
 
-router.post('/', async (req: Request, res: Response) => {
-	const { address, action, token_size, token, price, fee, btc_amount, datetime } = req.body;
+router.post("/", async (req: Request, res: Response) => {
+  // handle optional fields
+  let query: string = "INSERT INTO historical_records (";
+  let values = "VALUES (";
 
-	// handle optional fields
-	let query: string = "INSERT INTO historical_records (address, action, token_size, token, datetime";
-	let values = "VALUES (?, ?, ?, ?, ?";
-	let params: any[] = [address, action, token_size, token, datetime];
+  let params: any[] = [];
 
-	if (price) {
-		query += ", price";
-		values += ", ?";
-		params.push(price);
-	}
+  for (const attr in req.body) {
+    query += attr + ", ";
+    values += "?, ";
+    params.push(req.body[attr]);
+  }
 
-	if (fee) {
-		query += ", fee";
-		values += ", ?";
-		params.push(fee);
-	}
+  // Remove the Last Comma & Space
+  query = query.slice(0, -2);
+  values = values.slice(0, -2);
 
-	if (btc_amount) {
-		query += ", btc_amount";
-		values += ", ?";
-		params.push(btc_amount);
-	}
+  query += ") " + values + ")";
 
-	query += ") " + values + ")";
+  // Open Connection
+  if (!connection.connect()) {
+    res.send({ message: "Connection failed" });
+    return;
+  }
 
-	connection.conn.execute(query, params);
+  connection.execute(query, params);
 
-	res.send({ message: "Record added" });
+  connection.close();
 
+  res.send({ message: "Record added" });
 });
 
-router.put('/:id', async (req: Request, res: Response) => {
-	const id = Number(req.params.id);
-	if (!id) {
-		return res.status(400).send({ error: "Record id not provided" })
-	}
+router.put("/:id", async (req: Request, res: Response) => {
+  console.log(req.body);
+  const id = Number(req.params.id);
+  if (!id) {
+    return res.status(400).send({ error: "Record id not provided" });
+  }
+  console.log(id);
 
-	const { address, action, token_size, token, price, fee, btc_amount, datetime } = req.body;
-	let query: string = "UPDATE orders SET address = ?, action = ?, token_size = ?, token = ?, price = ?, fee = ?, btc_amount = ?, datetime = ? WHERE id = ?";
+  let sql = "UPDATE historical_records SET ";
+  let values: any[] = [];
 
-	connection.conn.execute(query, [address, action, token_size, token, price, fee, btc_amount, datetime]);
-	connection.conn.end();
+  for (const attr in req.body) {
+    sql += attr + " = ?, ";
+    values.push(req.body[attr]);
+  }
 
-	res.send({ message: "Record added" });
+  // Remove the Last Comma & Space
+  sql = sql.slice(0, -2);
+
+  sql += " WHERE id = ?";
+
+  values.push(id);
+  console.log(sql);
+  console.log(values);
+
+  // Open Connection
+  if (!connection.connect()) {
+    res.send({ message: "Connection failed" });
+    return;
+  }
+  connection.execute(sql, values);
+
+  connection.close();
+
+  res.send({ message: "Record added successfully." });
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
-	const id = Number(req.params.id);
-	if (!id) {
-		return res.status(400).send({ error: "Record id not provided" })
-	}
+router.delete("/:id", async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!id) {
+    return res.status(400).send({ error: "Record id not provided" });
+  }
 
-	connection.conn.execute("DELETE FROM historical_records WHERE id = ?", [id]);
-	connection.conn.end();
+  // Open Connection
+  if (!connection.connect()) {
+    res.send({ message: "Connection failed" });
+    return;
+  }
+  connection.execute("DELETE FROM historical_records WHERE id = ?", [id]);
+  connection.close();
 
-	res.send({ message: "Record deleted" })
-
+  res.send({ message: "Record deleted" });
 });
 
 export default router;

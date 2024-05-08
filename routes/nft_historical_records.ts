@@ -2,17 +2,17 @@ import express, { Request, Response } from "express";
 import { RowDataPacket } from "mysql2";
 import connection from "../connection";
 
-export interface Order extends RowDataPacket {
+interface NftHistoricalRecord extends RowDataPacket {
   id: number;
   address: string;
-  tick: string;
-  side: number;
-  amt: number;
-  price: number;
-  expiration: number;
-  expired: number;
+  action: string;
   txid: string;
-  fulfilled: number;
+  inscription_id: string;
+  inscription_number: string;
+  name: string;
+  price: number;
+  fee?: number;
+  datetime: string;
 }
 
 const router = express.Router();
@@ -20,51 +20,32 @@ const router = express.Router();
 router.get("/", async (req: Request, res: Response) => {
   // check query string
   let addr = req.query.address;
-  let tick = req.query.tick;
-  let id = req.query.id;
 
-  // Retrieving Orders from SQL Table
-  let query: string = "SELECT * FROM orders";
-  const conditions: string[] = [];
-  const params: string[] = [];
+  let query: string = "SELECT * FROM nft_historical_records";
+  const params: String[] = [];
 
-  // Adding Filters if Specify by the App
   if (addr) {
-    conditions.push("address = ?");
+    query += " WHERE address = ?";
     params.push(`${addr}`);
-  }
-
-  // Adding Filters if Specify by the App
-  if (tick) {
-    conditions.push("tick = ?");
-    params.push(`${tick}`);
-  }
-
-  // Getting a Single Order Record
-  if (id) {
-    conditions.push("id = ?");
-    params.push(`${id}`);
-  }
-
-  // Adding Filters to the Query String
-  if (conditions.length) {
-    query += " WHERE " + conditions.join(" AND ");
   }
 
   // Open Connection
   if (!connection.connect()) {
-    res.send([]);
+    res.send({ message: "Connection failed" });
     return;
   }
 
-  // Retrieving Order Records in an Array
-  const rows: Order[] = await connection.select<Order>(query, params);
+  const rows: NftHistoricalRecord[] =
+    await connection.select<NftHistoricalRecord>(query, params);
+
+  connection.close();
+
   res.send(rows);
 });
 
 router.post("/", async (req: Request, res: Response) => {
   // handle optional fields
-  let query: string = "INSERT INTO orders (";
+  let query: string = "INSERT INTO nft_historical_records (";
   let values = "VALUES (";
 
   let params: any[] = [];
@@ -91,19 +72,19 @@ router.post("/", async (req: Request, res: Response) => {
 
   connection.close();
 
-  res.send({ message: "Order added" });
+  res.send({ message: "Record added" });
 });
 
-// PUT Modify an Order Record Given its ID
 router.put("/:id", async (req: Request, res: Response) => {
-  console.log(req.body);
   const id = Number(req.params.id);
   if (!id) {
-    return res.status(400).send({ error: "Order id not provided" });
+    return res
+      .status(400)
+      .send({ error: "Nft Historical Record id not provided" });
   }
   console.log(id);
 
-  let sql = "UPDATE orders SET ";
+  let sql = "UPDATE nft_historical_records SET ";
   let values: any[] = [];
 
   for (const attr in req.body) {
@@ -126,10 +107,26 @@ router.put("/:id", async (req: Request, res: Response) => {
     return;
   }
   connection.execute(sql, values);
-
   connection.close();
 
-  res.send({ message: "Order added successfully." });
+  res.send({ message: "Record added" });
+});
+
+router.delete("/:id", async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+  if (!id) {
+    return res.status(400).send({ error: "Record id not provided" });
+  }
+
+  // Open Connection
+  if (!connection.connect()) {
+    res.send({ message: "Connection failed" });
+    return;
+  }
+  connection.execute("DELETE FROM nft_historical_records WHERE id = ?", [id]);
+  connection.close();
+
+  res.send({ message: "Record deleted" });
 });
 
 export default router;

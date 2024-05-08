@@ -12,3 +12,6 @@ yarn-error.log*
 .npm
 .eslintcache
 .env
+utxo.json
+inscribeTest.ts
+test.ts

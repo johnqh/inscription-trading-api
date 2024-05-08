@@ -2,16 +2,17 @@ import express, { Request, Response } from "express";
 import { RowDataPacket } from "mysql2";
 import connection from "../connection";
 
-export interface Order extends RowDataPacket {
+export interface NftOrder extends RowDataPacket {
   id: number;
-  address: string;
-  tick: string;
-  side: number;
-  amt: number;
+  seller_address: string;
+  buyer_address: string;
+  txid: string;
+  inscription_id: string;
+  inscription_number: string;
+  name: string;
   price: number;
   expiration: number;
   expired: number;
-  txid: string;
   fulfilled: number;
 }
 
@@ -19,31 +20,17 @@ const router = express.Router();
 
 router.get("/", async (req: Request, res: Response) => {
   // check query string
-  let addr = req.query.address;
-  let tick = req.query.tick;
-  let id = req.query.id;
+  let seller_addr = req.query.seller_address;
 
   // Retrieving Orders from SQL Table
-  let query: string = "SELECT * FROM orders";
+  let query: string = "SELECT * FROM nft_orders";
   const conditions: string[] = [];
   const params: string[] = [];
 
   // Adding Filters if Specify by the App
-  if (addr) {
-    conditions.push("address = ?");
-    params.push(`${addr}`);
-  }
-
-  // Adding Filters if Specify by the App
-  if (tick) {
-    conditions.push("tick = ?");
-    params.push(`${tick}`);
-  }
-
-  // Getting a Single Order Record
-  if (id) {
-    conditions.push("id = ?");
-    params.push(`${id}`);
+  if (seller_addr) {
+    conditions.push("seller_address = ?");
+    params.push(`${seller_addr}`);
   }
 
   // Adding Filters to the Query String
@@ -58,13 +45,13 @@ router.get("/", async (req: Request, res: Response) => {
   }
 
   // Retrieving Order Records in an Array
-  const rows: Order[] = await connection.select<Order>(query, params);
+  const rows: NftOrder[] = await connection.select<NftOrder>(query, params);
   res.send(rows);
 });
 
 router.post("/", async (req: Request, res: Response) => {
   // handle optional fields
-  let query: string = "INSERT INTO orders (";
+  let query: string = "INSERT INTO nft_orders (";
   let values = "VALUES (";
 
   let params: any[] = [];
@@ -91,7 +78,7 @@ router.post("/", async (req: Request, res: Response) => {
 
   connection.close();
 
-  res.send({ message: "Order added" });
+  res.send({ message: "Action added successfully." });
 });
 
 // PUT Modify an Order Record Given its ID
@@ -103,7 +90,7 @@ router.put("/:id", async (req: Request, res: Response) => {
   }
   console.log(id);
 
-  let sql = "UPDATE orders SET ";
+  let sql = "UPDATE nft_orders SET ";
   let values: any[] = [];
 
   for (const attr in req.body) {
