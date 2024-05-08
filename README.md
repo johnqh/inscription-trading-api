@@ -55,7 +55,7 @@ expired: int
 ```
 id: int auto_increment
 address: varchar
-action: enum("buy" or "sell", "transfer_out", "transfer_in", "bought", "sold")
+action: enum("buy", "sell", "transfer_out", "transfer_in", "bought", "sold")
 token_size: double
 token: varchar
 price: double
@@ -93,7 +93,9 @@ fee?: double
 datetime: varchar
 ```
 
-## Installation
+## Installation and Running
+
+NodeJS is required to install and run the API and order matching.
 
 From a clone or archive of the repository, run `npm install` to install the
 dependencies. 
@@ -104,10 +106,13 @@ cannot communicate to the database or UniSat. The following variables are requir
 ```
 DATABASE_URL=<url to mysql database>
 API_KEY=<unisat api key>
+EXCHANGE_WALLET=<exchange wallet for holding assets before order fulfillment>
 ```
 
-Then run `npm run start` to start the server. By default, it runs
+Then run `npm run start` to start the API. By default, it runs
 on port 3000.
+
+To run order matching, run `ts-node order_matching.ts`. It is recommended to run it with a cronjob or some other periodic scheduler.
 
 ## Routes
 
@@ -172,8 +177,7 @@ POST adds a historical record to the database.
 #### /historical\_records/:id
 
 PUT modifies a historical record with the provided `id` with the properties of
-the request. All properties must be present or else they will be replace with
-`null`.
+the request. Properties not included in the body will remain untouched.
 
 DELETE removes the historical record with the given `id`.
 
@@ -226,8 +230,7 @@ track of them.
 
 #### /orders/:id
 
-PUT modifies the order with the given `id`. All other properties must be given
-or else they will be replaced with `null`
+PUT modifies the order with the given `id`. Properties not included in the body will remain untouched.
 
 ### /nft\_orders
 
@@ -254,8 +257,7 @@ POST operates the same as it does in `orders`.
 
 #### /nft\_orders/:id
 
-PUT modifies the order with the given `id`. All other properties must be given
-or else they will be replaced with `null`
+PUT modifies the order with the given `id`. Properties not included in the body will remain untouched.
 
 ### /nft\_historical\_records
 
@@ -283,7 +285,5 @@ POST adds a historical record to the database.
 #### /nft\_historical\_records/:id
 
 PUT modifies a historical record with the provided `id` with the properties of
-the request. All properties must be present or else they will be replace with
-`null`.
-
+the request. Properties not included in the body will remain untouched.
 DELETE removes the historical record with the given `id`.
