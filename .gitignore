@@ -14,3 +14,4 @@ yarn-error.log*
 .env
 utxo.json
 inscribeTest.ts
+test.ts

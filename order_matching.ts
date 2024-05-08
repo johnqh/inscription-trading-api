@@ -8,7 +8,6 @@ import moment from "moment";
 import axios from "axios";
 import {
   placeInscriptionOrder,
-  completeOrder,
   checkStatus,
   fulfillOrder,
   sendBTC,
@@ -188,6 +187,8 @@ async function orderMatching() {
           // Populate Historical Record Table for Seller(s)
           await axios.post(`${apiPrefix}/historical_records`, ask);
 
+          ask.order = askOrder;
+
           // Edge Case for Last Seller whose's Tokens were Not All Used Up
           if (askOrder) {
             if (ask.token_size < askOrder.amt) {
@@ -276,14 +277,14 @@ async function processOngoingMatches(uxtos: string[]) {
         continue;
       }
       // Retrieving Buyer's Order Information
-      let buyer_order = await axios.get(
-        `${apiPrefix}/orders?id=${match.buyer_order}`
-      )[0];
+      let buyer_order = (
+        await axios.get(`${apiPrefix}/orders?id=${match.buyer_order}`)
+      ).data[0];
 
       // Retrieving Seller's Order Information
-      let seller_order = await axios.get(
-        `${apiPrefix}/orders?id=${match.seller_order}`
-      )[0];
+      let seller_order = (
+        await axios.get(`${apiPrefix}/orders?id=${match.seller_order}`)
+      ).data[0];
 
       // UniSat Order ID Used to Cehck on Inscription Status ONLY
       if (!match.unisat_order_id) {
@@ -292,6 +293,9 @@ async function processOngoingMatches(uxtos: string[]) {
           seller_order.tick,
           seller_order.amt
         );
+
+        console.log("----- UNISAT INSCRIPTION ORDER INFO -----");
+        console.log(data);
 
         // UniSat Address we Pay for our Inscribe Transfer Order
         const unisat = data.payAddress;
@@ -360,18 +364,19 @@ async function processNftOrders(uxtos: string[]) {
     const orders = response.data;
 
     for (const order of orders) {
-      if (
-        !order.seller_txid ||
-        !uxtos.includes(order.seller_txid) ||
-        !order.buyer_txid ||
-        !uxtos.includes(order.buyer_txid)
-      ) {
-        continue;
-      }
-
       if (!order.fulfilled) {
+        if (
+          !order.seller_txid ||
+          !uxtos.includes(order.seller_txid) ||
+          !order.buyer_txid ||
+          !uxtos.includes(order.buyer_txid)
+        ) {
+          continue;
+        }
+        console.log("----- Fulfilling Order -----");
+        console.log(order);
         // NFT -> Buyer, BTC -> Seller, 1% -> Exchange
-        await fulfillOrder(
+        let txid = await fulfillOrder(
           exchange_wallet,
           order.buyer_address,
           order.seller_address,
@@ -381,17 +386,22 @@ async function processNftOrders(uxtos: string[]) {
 
         await axios.put(`${apiPrefix}/nft_orders/${order.id}`, {
           fulfilled: 1,
+          fulfillment_txid: txid,
         });
       } else if (order.fulfillment_txid && !order.completed_order) {
+        console.log("----- Checking Order Status -----");
         const restURL = `https://blockstream.info/testnet/api/address/${order.buyer_address}/utxo`;
         const res = await axios.get(restURL);
         let txids = res.data.map((utxo: any) => utxo.txid);
 
         // Buyer has TXID in his Wallet Thus Transaction went Through
         if (txids.includes(order.fulfillment_txid)) {
-          await axios.put(`${apiPrefix}/match_fulfillment/${order.id}`, {
+          console.log("----- Order was Completed -----");
+          await axios.put(`${apiPrefix}/nft_orders/${order.id}`, {
             completed_order: 1,
           });
+        } else {
+          console.log("----- Transaction Still Pending -----");
         }
       }
     }

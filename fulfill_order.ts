@@ -115,7 +115,7 @@ export const getTaprootP2TR = (
  */
 
 // Creates and Brodcasts a Bitcoin Transaction: Sends BTC
-export const sendBTC = async (
+const sendBTC = async (
   exchange: string,
   to: string,
   amount: number,
@@ -569,7 +569,7 @@ async function placeInscriptionOrder(tick: string, amount: string) {
         devAddress: "",
         devFee: 0,
         brc20Ticker: tick,
-        brc20Amount: amount,
+        brc20Amount: String(amount),
       },
       {
         headers: {
@@ -579,6 +579,8 @@ async function placeInscriptionOrder(tick: string, amount: string) {
       }
     );
     let responseData = response.data;
+    console.log(response);
+    console.log(response.data);
     return responseData.data;
   } catch (error: any) {
     console.error("Error:", error.message);
@@ -620,7 +622,6 @@ async function checkStatus(orderID: string) {
       );
 
       // TXID: Needed to Send from Exchange => Buyer
-      console.log(res.data.data.utxo.txid);
       return res.data.data.utxo.txid;
     } else {
       return null;
@@ -682,7 +683,7 @@ async function completeOrder(
   );
 }
 
-export { placeInscriptionOrder, checkStatus, fulfillOrder, completeOrder };
+export { placeInscriptionOrder, checkStatus, fulfillOrder, sendBTC };
 
 /*
 ------- References ----
